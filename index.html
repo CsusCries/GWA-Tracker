@@ -29,7 +29,7 @@
 <div class="wrap" id="app" hidden>
  <nav class="nav">
   <button data-tab="dashboard">Dashboard</button><button data-tab="teachers">Teachers</button>
-  <button data-tab="students">Students</button><button data-tab="registrations">Registrations</button>
+  <button data-tab="students">Students</button><button data-tab="registrations">Registrations</button><button data-tab="settings">Settings</button>
   <button class="logout" id="logoutBtn" type="button">Logout</button>
  </nav>
  <div class="pagehead"><div><span class="pill">OPERATIONS</span><h2 id="pageTitle">Admin Dashboard</h2></div><span class="online" id="online">System online</span></div>
@@ -57,11 +57,11 @@
  <section id="students" class="tab" hidden>
   <div class="card">
    <div class="toolbar"><h3>Students by Year, Section, and Gender</h3><button class="btn" id="addStudent">+ Add Student</button></div>
-   <p class="sub">Students are grouped by year level, section, and gender. Sections A, B, and C are balanced within each year level.</p>
+   <p class="sub">Students are grouped by year level, section, and gender. Sections and subjects for each year level are set on the Settings tab.</p>
    <label for="q">Search Student</label><input id="q" placeholder="Search by name, email, ID, section, or gender">
    <label for="ln">Filter by Last Name</label><input id="ln" placeholder="Enter a last name">
    <div class="grid2"><div><label for="fy">Year Level</label><select id="fy"><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div>
-   <div><label for="fsec">Section</label><select id="fsec"><option value="">All sections</option><option>A</option><option>B</option><option>C</option></select></div></div>
+   <div><label for="fsec">Section</label><select id="fsec"></select></div></div>
    <div class="grid2"><div><label for="fg">Gender</label><select id="fg"><option value="">All</option><option>Male</option><option>Female</option></select></div>
    <div><label for="fs">Sort within group</label><select id="fs"><option value="name">Last name</option><option value="gwa">GWA (best first)</option></select></div></div>
    <div class="subjects" id="subjects"></div>
@@ -85,6 +85,27 @@
    <div class="scroll"><table><thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Details</th><th>Status</th><th></th></tr></thead><tbody id="rlist"></tbody></table></div>
   </div>
  </section>
+ <section id="settings" class="tab" hidden>
+  <div class="card">
+   <h3>Year Level Settings</h3>
+   <p class="sub">Choose a year level, then set its section names and the subjects in its curriculum. Changes apply to every student in that year level.</p>
+   <div class="yeartabs" id="setYears"><button data-y="1">1st Year</button><button data-y="2">2nd Year</button><button data-y="3">3rd Year</button><button data-y="4">4th Year</button></div>
+  </div>
+  <div class="setgrid">
+   <div class="card">
+    <div class="toolbar"><h3 id="secTitle">Sections</h3><button class="btn ghost sm" id="addSec" type="button">+ Add section</button></div>
+    <p class="sub">Rename a section and its students move with it. A section can only be removed when it has no students.</p>
+    <div id="secList"></div>
+   </div>
+   <div class="card">
+    <div class="toolbar"><h3 id="curTitle">Curriculum</h3><button class="btn ghost sm" id="addSub" type="button">+ Add subject</button></div>
+    <p class="sub" id="curSum"></p>
+    <div class="subrow subhead"><span>Subject</span><span>Units</span><span></span></div>
+    <div id="subList"></div>
+   </div>
+  </div>
+  <div class="savebar"><span id="setErr" class="err"></span><button class="btn ghost" id="setReset" type="button">Discard changes</button><button class="btn" id="setSave" type="button">Save settings</button></div>
+ </section>
 </div>
 
 <dialog id="dStudent"><form method="dialog" id="fStudent">
@@ -92,7 +113,7 @@
  <div class="grid2"><div><label>First name</label><input name="first_name" required></div><div><label>Last name</label><input name="last_name" required></div></div>
  <div class="grid2"><div><label>Student ID</label><input name="student_id" required placeholder="025-0001"></div><div><label>Email</label><input name="email" type="email" required></div></div>
  <div class="grid2"><div><label>Gender</label><select name="gender"><option>Male</option><option>Female</option></select></div>
- <div class="grid2" style="gap:0 8px"><div><label>Year</label><select name="year"><option>1</option><option>2</option><option>3</option><option>4</option></select></div><div><label>Section</label><select name="section"><option>A</option><option>B</option><option>C</option></select></div></div></div>
+ <div class="grid2" style="gap:0 8px"><div><label>Year</label><select name="year"><option>1</option><option>2</option><option>3</option><option>4</option></select></div><div><label>Section</label><select name="section" id="stuSec"></select></div></div></div>
  <div id="gradesBox"><label>Grades · <span id="subjYear"></span> subjects <span style="font-weight:400;color:var(--muted)">(subject · units · grade 1.00–5.00) — GWA: <b id="liveGwa">–</b></span></label>
   <div id="grades"></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 18px"><button type="button" class="btn ghost sm" id="addGrade">+ Add subject</button><button type="button" class="btn ghost sm" id="loadSubjects">Reset to year-level subjects</button></div></div>
  <p id="dsErr" style="color:var(--danger)"></p>
@@ -111,7 +132,7 @@
  <div class="grid2"><div><label>First name</label><input name="first_name" required></div><div><label>Last name</label><input name="last_name" required></div></div>
  <label>Email</label><input name="email" type="email" required>
  <div id="regStu" class="grid2"><div><label>Gender</label><select name="gender"><option>Male</option><option>Female</option></select></div>
-  <div class="grid2" style="gap:0 8px"><div><label>Year</label><select name="year"><option>1</option><option>2</option><option>3</option><option>4</option></select></div><div><label>Section</label><select name="section"><option value="">Auto</option><option>A</option><option>B</option><option>C</option></select></div></div></div>
+  <div class="grid2" style="gap:0 8px"><div><label>Year</label><select name="year"><option>1</option><option>2</option><option>3</option><option>4</option></select></div><div><label>Section</label><select name="section" id="regSec"></select></div></div></div>
  <div id="regTea" hidden><label>Subject</label><input name="subject"></div>
  <p id="drErr" style="color:var(--danger)"></p>
  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button><button class="btn" value="save">Submit</button></div>

@@ -6,6 +6,7 @@
  * using the same routes a real backend would expose:
  *
  *   GET    /curriculum          (subjects and units per year level)
+ *   GET    /settings            PUT  /settings/:year  (sections and subjects of a year level)
  *   GET    /stats
  *   GET    /students            POST /students
  *   GET    /students/:id        PUT  /students/:id   DELETE /students/:id
@@ -30,7 +31,7 @@
   // Demo-only credentials. Anyone can read these, so this is not real security.
   const ADMIN_USER = 'admin', ADMIN_PASS = 'admin123';
   // Subjects and units for each year level. Edit this list to match your curriculum.
-  const CURRICULUM = {
+  const DEFAULT_CURRICULUM = {
     1: [['Introduction to Computing', 3], ['Computer Programming 1', 3], ['Mathematics in the Modern World', 3],
         ['Purposive Communication', 3], ['Understanding the Self', 3], ['PE 1', 2], ['NSTP 1', 3]],
     2: [['Data Structures and Algorithms', 3], ['Object-Oriented Programming', 3], ['Discrete Mathematics', 3],
@@ -47,6 +48,13 @@
     del(k) { try { localStorage.removeItem(k); } catch (e) {} },
   };
 
+  // Section names and curriculum per year level. Admins change these on the Settings tab.
+  function defaultSettings() {
+    const s = {};
+    for (const y of [1, 2, 3, 4]) s[y] = { sections: ['A', 'B', 'C'], subjects: DEFAULT_CURRICULUM[y].map(([subject, units]) => ({ subject, units })) };
+    return s;
+  }
+
   // Small seeded random generator so the demo data is the same every time.
   function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
 
@@ -56,7 +64,7 @@
     const girls = ['Patricia', 'Bea', 'Camille', 'Hannah', 'Francesca', 'Katrina', 'Andrea', 'Bianca', 'Isabel', 'Sofia', 'Erika', 'Nicole'];
     const lasts = ['Bautista', 'Bernardo', 'Castillo', 'Garcia', 'Morales', 'Magbanua', 'Salazar', 'Delos Santos', 'Manalo', 'Reyes', 'Cruz', 'Villanueva'];
     const grades = [1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0];
-    const d = { seq: { s: 0, t: 0, g: 0, r: 0 }, students: [], teachers: [], grades: [], registrations: [] };
+    const d = { seq: { s: 0, t: 0, g: 0, r: 0 }, students: [], teachers: [], grades: [], registrations: [], settings: defaultSettings() };
     let n = 0;
     for (let year = 1; year <= 4; year++) {
       const prefix = '0' + (26 - year);
@@ -65,7 +73,7 @@
         const s = { id: ++d.seq.s, student_id: `${prefix}-${num}`, first_name: pick(names), last_name: pick(lasts),
           email: `demo.student.${prefix}${num}@example.invalid`, gender, year, section };
         d.students.push(s);
-        for (const [subject, units] of CURRICULUM[year]) d.grades.push({ id: ++d.seq.g, student_id: s.id, subject, units, grade: pick(grades) });
+        for (const [subject, units] of DEFAULT_CURRICULUM[year]) d.grades.push({ id: ++d.seq.g, student_id: s.id, subject, units, grade: pick(grades) });
         n++;
       }
     }
@@ -83,6 +91,8 @@
   let data;
   try { data = JSON.parse(store.get(KEY)); } catch (e) { data = null; }
   if (!data || !Array.isArray(data.students)) data = seed();
+  if (!data.settings) data.settings = defaultSettings();
+  const sectionsOf = year => (data.settings[year] || { sections: [] }).sections;
   const save = () => store.set(KEY, JSON.stringify(data));
   save();
 
@@ -106,8 +116,9 @@
 
   function studentFields(b) {
     require(b, ['student_id', 'first_name', 'last_name', 'email', 'gender', 'year', 'section']);
+    if (!sectionsOf(+b.year).includes(String(b.section).trim())) fail(`Section "${b.section}" doesn't exist in year ${b.year}. Add it on the Settings tab.`);
     return { student_id: String(b.student_id).trim(), first_name: String(b.first_name).trim(), last_name: String(b.last_name).trim(),
-      email: String(b.email).trim(), gender: b.gender, year: +b.year, section: String(b.section).toUpperCase() };
+      email: String(b.email).trim(), gender: b.gender, year: +b.year, section: String(b.section).trim() };
   }
 
   // Keeps only rows with a subject and a grade; returns null when no grades were sent.
@@ -121,7 +132,39 @@
   }
 
   const routes = [
-    ['GET', /^\/curriculum$/, () => Object.fromEntries(Object.entries(CURRICULUM).map(([y, l]) => [y, l.map(([subject, units]) => ({ subject, units }))]))],
+    ['GET', /^\/curriculum$/, () => Object.fromEntries(Object.entries(data.settings).map(([y, s]) => [y, clone(s.subjects)]))],
+    ['GET', /^\/settings$/, () => {
+      const out = clone(data.settings);
+      for (const y in out) out[y].counts = Object.fromEntries(out[y].sections.map(sec => [sec, data.students.filter(s => s.year === +y && s.section === sec).length]));
+      return out;
+    }],
+    // body: { sections: [{ name, from }], subjects: [{ subject, units }] }. "from" is the old name when renaming (empty for new sections).
+    ['PUT', /^\/settings\/([1-4])$/, (m, b) => {
+      const year = +m[1], cur = data.settings[year];
+      const secs = (b.sections || []).map(x => ({ name: String(x.name || '').trim(), from: String(x.from || '').trim() }));
+      if (!secs.length) fail('A year level needs at least one section.');
+      if (secs.some(x => !x.name)) fail('Section names cannot be empty.');
+      const names = secs.map(x => x.name.toLowerCase());
+      if (new Set(names).size !== names.length) fail('Section names must be different.');
+      const kept = new Set(secs.map(x => x.from).filter(Boolean));
+      for (const old of cur.sections) if (!kept.has(old)) {
+        const n = data.students.filter(s => s.year === year && s.section === old).length;
+        if (n) fail(`Section ${old} still has ${n} student${n === 1 ? '' : 's'}. Move them to another section before removing it.`);
+      }
+      const subjects = (b.subjects || []).filter(x => !blank(x.subject)).map(x => {
+        const units = +x.units;
+        if (!(units > 0)) fail(`Units for "${x.subject}" must be more than 0.`);
+        return { subject: String(x.subject).trim(), units };
+      });
+      const subjNames = subjects.map(x => x.subject.toLowerCase());
+      if (new Set(subjNames).size !== subjNames.length) fail('Subjects must be different.');
+      // rename sections on students and pending registrations
+      const rename = Object.fromEntries(secs.filter(x => x.from && x.from !== x.name).map(x => [x.from, x.name]));
+      for (const s of data.students) if (s.year === year && s.section in rename) s.section = rename[s.section];
+      for (const r of data.registrations) if (r.year === year && r.section in rename) r.section = rename[r.section];
+      data.settings[year] = { sections: secs.map(x => x.name), subjects };
+      save(); return { message: 'Saved' };
+    }],
     ['GET', /^\/stats$/, () => {
       const by_year = { 1: { total: 0, Male: 0, Female: 0 }, 2: { total: 0, Male: 0, Female: 0 }, 3: { total: 0, Male: 0, Female: 0 }, 4: { total: 0, Male: 0, Female: 0 } };
       const list = data.students.map(withGwa);
@@ -191,7 +234,7 @@
       const student = b.role === 'Student';
       data.registrations.push({ id: ++data.seq.r, role: b.role, first_name: b.first_name.trim(), last_name: b.last_name.trim(), email: b.email.trim(),
         gender: student ? b.gender || null : null, year: student && !blank(b.year) ? +b.year : null,
-        section: student && !blank(b.section) ? String(b.section).toUpperCase() : null,
+        section: student && !blank(b.section) ? String(b.section).trim() : null,
         subject: student ? null : b.subject || null, status: 'Pending', created_at: new Date().toISOString() });
       save(); return { message: 'Created' };
     }],
@@ -205,11 +248,13 @@
           const year = reg.year || 1, prefix = '0' + (26 - year);
           let count = data.students.length, sid;
           do sid = `${prefix}-${String(count++).padStart(4, '0')}`; while (idTaken(sid));
-          let section = reg.section;
+          const secs = sectionsOf(year);
+          if (!secs.length) fail(`Year ${year} has no sections. Add one on the Settings tab first.`);
+          let section = secs.includes(reg.section) ? reg.section : null;
           if (!section) { // put the student in the least-filled section of their year
-            const counts = { A: 0, B: 0, C: 0 };
+            const counts = Object.fromEntries(secs.map(x => [x, 0]));
             for (const s of data.students) if (s.year === year && s.section in counts) counts[s.section]++;
-            section = Object.keys(counts).reduce((a, b) => counts[b] < counts[a] ? b : a);
+            section = secs.reduce((a, b) => counts[b] < counts[a] ? b : a);
           }
           data.students.push({ id: ++data.seq.s, student_id: sid, first_name: reg.first_name, last_name: reg.last_name,
             email: reg.email, gender: reg.gender || 'Male', year, section });
