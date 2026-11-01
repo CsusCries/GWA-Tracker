@@ -2,10 +2,13 @@
 
 A static website (HTML, CSS and JavaScript) for tracking students' General Weighted Average (GWA). There is no server.
 
-- **Dashboard**: total, male and female students, per-year breakdown, average GWA and top performers. Every tile is clickable.
-- **Students**: grouped by year, section and gender, with search and filters. Edit details and grades; the GWA is units-weighted.
-- **Teachers**: add, edit and delete.
+- **Dashboard**: totals, male/female, average GWA, honors, at-risk and not-yet-graded counts for the selected term. Every tile opens the matching list.
+- **School terms**: grades belong to a school year and semester. Pick any term at the top to view or correct it. Each student has a term GWA and an overall GWA, plus a GWA history.
+- **Students**: grouped by year and section, with search and filters (gender, standing). Select students to move them to another section or archive them. Archive has Undo, and archived students can be restored. Import from CSV, export to CSV, and print.
+- **Grade Sheet**: enter one subject's grades for a whole section at once, with live class average, passed/failed counts and remarks.
+- **Teachers**: add teachers and assign the classes (year, section and subject) they handle.
 - **Registrations**: approve or reject student and teacher sign-ups.
+- **Settings**: start the 2nd semester or end the school year (promotes 1st–3rd Year and graduates 4th Year), set the honors and at-risk GWA limits, and manage each year level's sections and per-semester curriculum. Risky changes ask for confirmation first.
 
 ## Use it
 

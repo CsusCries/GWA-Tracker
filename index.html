@@ -17,6 +17,7 @@
   <div class="logo red" aria-label="Department seal"><svg width="52" height="52" viewBox="0 0 52 52"><circle cx="26" cy="26" r="22" fill="none" stroke="#e8c27a" stroke-width="2"/><rect x="16" y="15" width="20" height="22" rx="4" fill="#e8c27a"/><path d="M20 22h12M20 27h12M20 32h8" stroke="#8b1d10" stroke-width="2"/></svg></div>
  </div>
 </header>
+
 <div class="wrap login-wrap" id="loginView" hidden>
  <form class="card" id="loginForm">
   <h3>Admin Sign In</h3><p class="sub">Use your admin credentials to manage the GWA tracker.</p>
@@ -26,57 +27,101 @@
   <button class="btn" style="width:100%">Sign in</button>
  </form>
 </div>
+
 <div class="wrap" id="app" hidden>
  <nav class="nav">
-  <button data-tab="dashboard">Dashboard</button><button data-tab="teachers">Teachers</button>
-  <button data-tab="students">Students</button><button data-tab="registrations">Registrations</button><button data-tab="settings">Settings</button>
+  <button data-tab="dashboard">Dashboard</button><button data-tab="students">Students</button><button data-tab="gradesheet">Grade Sheet</button>
+  <button data-tab="teachers">Teachers</button><button data-tab="registrations">Registrations</button><button data-tab="settings">Settings</button>
   <button class="logout" id="logoutBtn" type="button">Logout</button>
  </nav>
- <div class="pagehead"><div><span class="pill">OPERATIONS</span><h2 id="pageTitle">Admin Dashboard</h2></div><span class="online" id="online">System online</span></div>
+ <div class="pagehead">
+  <div><span class="pill">OPERATIONS</span><h2 id="pageTitle">Admin Dashboard</h2></div>
+  <div class="headright">
+   <label class="termpick" for="termSel"><span>Viewing term</span><select id="termSel"></select></label>
+   <span class="online" id="online">System online</span>
+  </div>
+ </div>
+ <div class="banner" id="termBanner" hidden></div>
 
+ <!-- ============ Dashboard ============ -->
  <section id="dashboard" class="tab">
   <div class="card">
-   <h3>Overview</h3><p class="sub">Click any tile to jump to the matching list.</p>
+   <h3>Overview · <span id="dTerm"></span></h3><p class="sub">Click any tile to open the matching list.</p>
    <div class="stats">
-    <button class="stat" data-go="students" data-gender=""><small>Total Students</small><b id="sTotal">–</b></button>
+    <button class="stat" data-go="students"><small>Total Students</small><b id="sTotal">–</b></button>
     <button class="stat" data-go="students" data-gender="Male"><small>Male</small><b id="sMale">–</b></button>
     <button class="stat" data-go="students" data-gender="Female"><small>Female</small><b id="sFemale">–</b></button>
-    <button class="stat" data-go="teachers"><small>Teachers</small><b id="sTeachers">–</b></button>
-    <button class="stat" data-go="registrations"><small>Pending Registrations</small><b id="sPending">–</b></button>
     <button class="stat" data-go="students" data-sort="gwa"><small>Average GWA</small><b id="sAvg">–</b></button>
+    <button class="stat ok" data-go="students" data-standing="honors"><small>Honors <i id="sHonLim"></i></small><b id="sHon">–</b></button>
+    <button class="stat bad" data-go="students" data-standing="risk"><small>At Risk <i id="sRiskLim"></i></small><b id="sRisk">–</b></button>
+    <button class="stat warn" data-go="students" data-standing="none"><small>Not Yet Graded</small><b id="sNone">–</b></button>
+    <button class="stat" data-go="registrations"><small>Pending Registrations</small><b id="sPending">–</b></button>
+    <button class="stat" data-go="teachers"><small>Teachers</small><b id="sTeachers">–</b></button>
    </div>
    <p class="legend"><span>Male</span> &nbsp; <span>Female</span></p>
    <div class="bar"><i id="barM"></i><i id="barF"></i></div>
    <p class="legend" id="barTxt"></p>
   </div>
   <div class="card"><h3>Students per Year Level</h3><p class="sub">Click a year level to open it in the Students list.</p><div class="yr" id="years"></div></div>
-  <div class="card"><h3>Top Performers</h3><p class="sub">Lowest GWA is best (1.00 = highest). Honors: GWA ≤ 1.75 · At risk: GWA &gt; 2.75 — <b id="hon"></b> honors, <b id="risk"></b> at risk.</p>
+  <div class="card"><h3>Top Performers</h3><p class="sub">Lowest GWA is best (1.00 is the highest grade).</p>
    <div class="scroll"><table><thead><tr><th>#</th><th>Name</th><th>ID</th><th>Year / Sec</th><th>GWA</th><th></th></tr></thead><tbody id="top"></tbody></table></div></div>
  </section>
 
+ <!-- ============ Students ============ -->
  <section id="students" class="tab" hidden>
   <div class="card">
-   <div class="toolbar"><h3>Students by Year, Section, and Gender</h3><button class="btn" id="addStudent">+ Add Student</button></div>
-   <p class="sub">Students are grouped by year level, section, and gender. Sections and subjects for each year level are set on the Settings tab.</p>
-   <label for="q">Search Student</label><input id="q" placeholder="Search by name, email, ID, section, or gender">
-   <label for="ln">Filter by Last Name</label><input id="ln" placeholder="Enter a last name">
-   <div class="grid2"><div><label for="fy">Year Level</label><select id="fy"><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div>
-   <div><label for="fsec">Section</label><select id="fsec"></select></div></div>
-   <div class="grid2"><div><label for="fg">Gender</label><select id="fg"><option value="">All</option><option>Male</option><option>Female</option></select></div>
-   <div><label for="fs">Sort by</label><select id="fs"><option value="name">Last name</option><option value="gwa">GWA (best first)</option><option value="id">Student ID</option><option value="section">Section</option><option value="gender">Gender</option></select></div></div>
-   <div class="subjects" id="subjects"></div>
+   <div class="toolbar"><h3>Students by Year, Section, and Gender</h3>
+    <div class="btnrow noprint"><button class="btn ghost" id="importBtn">Import CSV</button><button class="btn ghost" id="exportBtn">Export CSV</button><button class="btn ghost" id="printBtn">Print</button><button class="btn" id="addStudent">+ Add Student</button></div></div>
+   <div class="statustabs noprint" id="statusTabs" role="tablist"><button data-status="active" class="active">Active</button><button data-status="archived">Archived</button><button data-status="graduated">Graduated</button></div>
+   <div class="filters noprint">
+    <div class="grid2"><div><label for="q">Search Student</label><input id="q" placeholder="Search by name, email, ID, section, or gender"></div>
+     <div><label for="ln">Filter by Last Name</label><input id="ln" placeholder="Enter a last name"></div></div>
+    <div class="grid4">
+     <div><label for="fy">Year Level</label><select id="fy"><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div>
+     <div><label for="fsec">Section</label><select id="fsec"></select></div>
+     <div><label for="fg">Gender</label><select id="fg"><option value="">All</option><option>Male</option><option>Female</option></select></div>
+     <div><label for="fst">Standing</label><select id="fst"><option value="">All</option><option value="honors">Honors</option><option value="regular">Regular</option><option value="risk">At risk</option><option value="none">Not yet graded</option></select></div>
+    </div>
+    <div class="grid4"><div><label for="fs">Sort by</label><select id="fs"><option value="name">Last name</option><option value="gwa">GWA (best first)</option><option value="id">Student ID</option><option value="section">Section</option><option value="gender">Gender</option></select></div></div>
+   </div>
+   <div class="subjects noprint" id="subjects"></div>
+   <div class="bulkbar noprint" id="bulkbar" hidden>
+    <b id="bulkCount"></b>
+    <label for="bulkSec" class="inline">Move to</label><select id="bulkSec"></select><button class="btn sm" id="bulkMove">Move</button>
+    <button class="btn danger sm" id="bulkArchive">Archive</button><button class="btn ghost sm" id="bulkClear">Clear selection</button>
+   </div>
    <div id="tree"></div>
   </div>
  </section>
 
- <section id="teachers" class="tab" hidden>
+ <!-- ============ Grade Sheet ============ -->
+ <section id="gradesheet" class="tab" hidden>
   <div class="card">
-   <div class="toolbar"><h3>Teachers</h3><button class="btn" id="addTeacher">+ Add Teacher</button></div>
-   <label for="tq">Search Teacher</label><input id="tq" placeholder="Search by name, email, department, or subject">
-   <div class="scroll"><table><thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Subject</th><th></th></tr></thead><tbody id="tlist"></tbody></table></div>
+   <div class="toolbar"><h3>Class Grade Sheet</h3>
+    <div class="btnrow noprint"><button class="btn ghost" id="gsExport">Export CSV</button><button class="btn ghost" id="gsPrint">Print</button></div></div>
+   <p class="sub noprint">Enter grades for a whole class at once. Pick the year level, section and subject. Press Enter to move to the next student.</p>
+   <div class="grid3 noprint">
+    <div><label for="gsY">Year Level</label><select id="gsY"><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div>
+    <div><label for="gsSec">Section</label><select id="gsSec"></select></div>
+    <div><label for="gsSub">Subject</label><select id="gsSub"></select></div>
+   </div>
+   <div class="gsinfo" id="gsInfo"></div>
+   <div id="gsBody"></div>
+   <div class="savebar noprint" id="gsBar" hidden><span id="gsErr" class="err"></span><button class="btn ghost" id="gsReset">Discard changes</button><button class="btn" id="gsSave">Save grades</button></div>
   </div>
  </section>
 
+ <!-- ============ Teachers ============ -->
+ <section id="teachers" class="tab" hidden>
+  <div class="card">
+   <div class="toolbar"><h3>Teachers</h3><button class="btn" id="addTeacher">+ Add Teacher</button></div>
+   <p class="sub">Assign each teacher the classes they handle. The Grade Sheet shows who teaches each class.</p>
+   <label for="tq">Search Teacher</label><input id="tq" placeholder="Search by name, email, department, or class">
+   <div class="scroll"><table><thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Classes</th><th></th></tr></thead><tbody id="tlist"></tbody></table></div>
+  </div>
+ </section>
+
+ <!-- ============ Registrations ============ -->
  <section id="registrations" class="tab" hidden>
   <div class="card">
    <div class="toolbar"><h3>Registrations</h3><button class="btn" id="addReg">+ New Registration</button></div>
@@ -85,10 +130,28 @@
    <div class="scroll"><table><thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Details</th><th>Status</th><th></th></tr></thead><tbody id="rlist"></tbody></table></div>
   </div>
  </section>
+
+ <!-- ============ Settings ============ -->
  <section id="settings" class="tab" hidden>
-  <div class="card">
+  <div class="setgrid">
+   <div class="card">
+    <h3>School Term</h3>
+    <p class="sub">The current term is where new grades go by default. Use the term picker at the top to look at past terms.</p>
+    <div class="curterm"><small>Current term</small><b id="curTerm">–</b></div>
+    <div class="btnrow" style="margin:14px 0 6px"><button class="btn" id="nextSem">Start 2nd Semester</button><button class="btn" id="promoteBtn">End school year &amp; promote</button></div>
+    <p class="sub" id="termHint" style="margin:6px 0 0"></p>
+   </div>
+   <div class="card">
+    <h3>Grading Standing</h3>
+    <p class="sub">GWA limits used for honors and at-risk counts, filters and badges.</p>
+    <div class="grid2"><div><label for="limHon">Honors: GWA at or better than</label><input id="limHon" type="number" min="1" max="5" step="0.05"></div>
+     <div><label for="limRisk">At risk: GWA worse than</label><input id="limRisk" type="number" min="1" max="5" step="0.05"></div></div>
+    <div class="btnrow"><span class="err" id="limErr"></span><button class="btn" id="limSave">Save limits</button></div>
+   </div>
+  </div>
+  <div class="card" style="margin-top:24px">
    <h3>Year Level Settings</h3>
-   <p class="sub">Choose a year level, then set its section names and the subjects in its curriculum. Changes apply to every student in that year level.</p>
+   <p class="sub">Choose a year level, then set its section names and the subjects in each semester. Changes apply to every student in that year level.</p>
    <div class="yeartabs" id="setYears"><button data-y="1">1st Year</button><button data-y="2">2nd Year</button><button data-y="3">3rd Year</button><button data-y="4">4th Year</button></div>
   </div>
   <div class="setgrid">
@@ -99,6 +162,7 @@
    </div>
    <div class="card">
     <div class="toolbar"><h3 id="curTitle">Curriculum</h3><button class="btn ghost sm" id="addSub" type="button">+ Add subject</button></div>
+    <div class="semtabs" id="semTabs"><button data-sem="1">1st Semester</button><button data-sem="2">2nd Semester</button></div>
     <p class="sub" id="curSum"></p>
     <div class="subrow subhead"><span>Subject</span><span>Units</span><span></span></div>
     <div id="subList"></div>
@@ -108,23 +172,34 @@
  </section>
 </div>
 
+<!-- ============ Dialogs ============ -->
 <dialog id="dStudent"><form method="dialog" id="fStudent">
  <h3 id="dsTitle">Student</h3>
  <div class="grid2"><div><label>First name</label><input name="first_name" required></div><div><label>Last name</label><input name="last_name" required></div></div>
  <div class="grid2"><div><label>Student ID</label><input name="student_id" required placeholder="025-0001"></div><div><label>Email</label><input name="email" type="email" required></div></div>
  <div class="grid2"><div><label>Gender</label><select name="gender"><option>Male</option><option>Female</option></select></div>
  <div class="grid2" style="gap:0 8px"><div><label>Year</label><select name="year"><option>1</option><option>2</option><option>3</option><option>4</option></select></div><div><label>Section</label><select name="section" id="stuSec"></select></div></div></div>
- <div id="gradesBox"><label>Grades · <span id="subjYear"></span> subjects <span style="font-weight:400;color:var(--muted)">(subject · units · grade 1.00–5.00) — GWA: <b id="liveGwa">–</b></span></label>
-  <div id="grades"></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 18px"><button type="button" class="btn ghost sm" id="addGrade">+ Add subject</button><button type="button" class="btn ghost sm" id="loadSubjects">Reset to year-level subjects</button></div></div>
- <p id="dsErr" style="color:var(--danger)"></p>
+ <div class="gwasum" id="gwaSum"></div>
+ <div id="gradesBox"><label>Grades · <span id="subjTerm"></span> <span style="font-weight:400;color:var(--muted)">(subject · units · grade 1.00–5.00) — term GWA: <b id="liveGwa">–</b></span></label>
+  <div id="grades"></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 18px"><button type="button" class="btn ghost sm" id="addGrade">+ Add subject</button><button type="button" class="btn ghost sm" id="loadSubjects">Reset to curriculum subjects</button></div></div>
+ <div id="historyBox"></div>
+ <p id="dsErr" class="err"></p>
  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button><button class="btn" value="save">Save</button></div>
 </form></dialog>
 
 <dialog id="dTeacher"><form method="dialog" id="fTeacher"><h3 id="dtTitle">Teacher</h3>
  <label>Name</label><input name="name" required><label>Email</label><input name="email" type="email" required>
- <div class="grid2"><div><label>Department</label><input name="department"></div><div><label>Subject</label><input name="subject"></div></div>
- <p id="dtErr" style="color:var(--danger)"></p>
+ <div class="grid2"><div><label>Department</label><input name="department"></div><div><label>Specialization</label><input name="subject"></div></div>
+ <p id="dtErr" class="err"></p>
  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button><button class="btn" value="save">Save</button></div>
+</form></dialog>
+
+<dialog id="dAssign"><form method="dialog" id="fAssign"><h3 id="daTitle">Assign class</h3>
+ <div class="grid2"><div><label>Year Level</label><select name="year" id="asY"><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div>
+  <div><label>Section</label><select name="section" id="asSec"></select></div></div>
+ <label>Subject</label><select name="subject" id="asSub"></select>
+ <p id="daErr" class="err"></p>
+ <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button><button class="btn" value="save">Assign</button></div>
 </form></dialog>
 
 <dialog id="dReg"><form method="dialog" id="fReg"><h3>New Registration</h3>
@@ -134,19 +209,31 @@
  <div id="regStu" class="grid2"><div><label>Gender</label><select name="gender"><option>Male</option><option>Female</option></select></div>
   <div class="grid2" style="gap:0 8px"><div><label>Year</label><select name="year"><option>1</option><option>2</option><option>3</option><option>4</option></select></div><div><label>Section</label><select name="section" id="regSec"></select></div></div></div>
  <div id="regTea" hidden><label>Subject</label><input name="subject"></div>
- <p id="drErr" style="color:var(--danger)"></p>
+ <p id="drErr" class="err"></p>
  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button><button class="btn" value="save">Submit</button></div>
 </form></dialog>
+
+<dialog id="dImport"><form method="dialog" id="fImport"><h3>Import Students from CSV</h3>
+ <p class="sub" style="margin:0 0 10px">Columns: <code>student_id, first_name, last_name, email, gender, year, section</code>. Leave <code>student_id</code> or <code>section</code> blank to fill them in automatically. Nothing is added if any row has a problem.</p>
+ <div class="btnrow" style="justify-content:flex-start;margin-bottom:12px"><button type="button" class="btn ghost sm" id="csvTemplate">Download template</button></div>
+ <label for="csvFile">CSV file</label><input type="file" id="csvFile" accept=".csv,text/csv">
+ <label for="csvText">…or paste CSV here</label><textarea id="csvText" rows="6" placeholder="student_id,first_name,last_name,email,gender,year,section"></textarea>
+ <p id="diPreview" class="sub"></p>
+ <pre id="diErr" class="err pre"></pre>
+ <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button><button class="btn" value="save">Import</button></div>
+</form></dialog>
+
 <dialog id="dConfirm"><form method="dialog" id="fConfirm">
  <h3 id="cfTitle">Save settings?</h3>
- <p class="sub" style="margin:0 0 10px">This change affects existing records:</p>
+ <p class="sub" id="cfIntro" style="margin:0 0 10px">This change affects existing records:</p>
  <ul class="cflist" id="cfList"></ul>
  <div id="cfGrades" class="cfbox"><p style="margin:0 0 10px">These subjects are being removed but students already have grades in them: <span id="cfGradesText"></span>.</p>
   <label class="radio"><input type="radio" name="removed_grades" value="keep" checked> Keep those grades (they still count toward GWA)</label>
   <label class="radio"><input type="radio" name="removed_grades" value="delete"> Delete those grades (GWA is recalculated without them)</label></div>
- <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button><button class="btn" value="ok">Save changes</button></div>
+ <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button><button class="btn" value="ok" id="cfOk">Save changes</button></div>
 </form></dialog>
-<div class="toast" id="toast"></div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"><span id="toastMsg"></span><button id="toastAct" hidden></button></div>
 <script src="js/db.js"></script>
 <script src="js/app.js"></script>
 </body>
