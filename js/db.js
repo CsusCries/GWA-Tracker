@@ -7,6 +7,7 @@
  *
  *   GET    /curriculum          (subjects and units per year level)
  *   GET    /settings            PUT  /settings/:year  (sections and subjects of a year level)
+ *   POST   /settings/:year/preview   (what a settings change would affect, without saving)
  *   GET    /stats
  *   GET    /students            POST /students
  *   GET    /students/:id        PUT  /students/:id   DELETE /students/:id
@@ -44,7 +45,7 @@
 
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
-    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked: keep in memory */ } },
+    set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }, // false = storage full or blocked
     del(k) { try { localStorage.removeItem(k); } catch (e) {} },
   };
 
@@ -90,14 +91,20 @@
 
   let data;
   try { data = JSON.parse(store.get(KEY)); } catch (e) { data = null; }
-  if (!data || !Array.isArray(data.students)) data = seed();
+  // Rebuild demo data if what's stored is missing or damaged, and fill in anything an older version didn't save
+  const valid = x => x && ['students', 'teachers', 'grades', 'registrations'].every(k => Array.isArray(x[k])) && x.seq;
+  if (!valid(data)) { if (data) console.warn('GWA Tracker: saved data was damaged, so demo data was restored.'); data = seed(); }
   if (!data.settings) data.settings = defaultSettings();
+  for (const y of [1, 2, 3, 4]) {
+    const s = data.settings[y] || (data.settings[y] = { sections: [], subjects: [] });
+    if (!Array.isArray(s.sections) || !s.sections.length) s.sections = ['A', 'B', 'C'];
+    if (!Array.isArray(s.subjects)) s.subjects = DEFAULT_CURRICULUM[y].map(([subject, units]) => ({ subject, units }));
+  }
   const sectionsOf = year => (data.settings[year] || { sections: [] }).sections;
-  const save = () => store.set(KEY, JSON.stringify(data));
-  save();
-
   class ApiError extends Error {}
   const fail = msg => { throw new ApiError(msg); };
+  const save = () => { if (!store.set(KEY, JSON.stringify(data))) fail("Couldn't save: this browser's storage is full or blocked. Your change was not kept."); };
+  try { save(); } catch (e) { console.warn(e.message); }
   const clone = o => JSON.parse(JSON.stringify(o));
   const blank = v => v === undefined || v === null || String(v).trim() === '';
   function require(body, keys) {
@@ -122,13 +129,59 @@
   }
 
   // Keeps only rows with a subject and a grade; returns null when no grades were sent.
+  const MAX_UNITS = 10, MAX_NAME = 60, MAX_SECTION = 30;
   function parseGrades(list) {
     if (!Array.isArray(list)) return null;
-    return list.filter(g => !blank(g.subject) && !blank(g.grade)).map(g => {
-      const grade = +g.grade, units = blank(g.units) ? 3 : +g.units;
-      if (!(grade >= 1 && grade <= 5) || !(units > 0)) fail('Grades must be 1.00-5.00 and units > 0');
-      return { subject: String(g.subject).trim(), units, grade };
+    const out = list.filter(g => !blank(g.subject) && !blank(g.grade)).map(g => {
+      const subject = String(g.subject).trim(), grade = +g.grade, units = blank(g.units) ? 3 : +g.units;
+      if (!(grade >= 1 && grade <= 5)) fail(`Grade for "${subject}" must be between 1.00 and 5.00.`);
+      if (!(units > 0 && units <= MAX_UNITS)) fail(`Units for "${subject}" must be more than 0 and at most ${MAX_UNITS}.`);
+      return { subject, units, grade };
     });
+    const seen = new Set();
+    for (const g of out) { const k = g.subject.toLowerCase(); if (seen.has(k)) fail(`"${g.subject}" is listed twice. Keep one grade per subject.`); seen.add(k); }
+    return out;
+  }
+
+  // Validates a Settings change and works out who it affects. Shared by the preview and the save.
+  function planSettings(year, b) {
+    const cur = data.settings[year];
+    const secs = (b.sections || []).map(x => ({ name: String(x.name || '').trim(), from: String(x.from || '').trim() }));
+    if (!secs.length) fail('A year level needs at least one section.');
+    if (secs.some(x => !x.name)) fail('Section names cannot be empty.');
+    if (secs.some(x => x.name.length > MAX_SECTION)) fail(`Section names can be at most ${MAX_SECTION} characters.`);
+    const names = secs.map(x => x.name.toLowerCase());
+    const dupS = names.find((n, i) => names.indexOf(n) !== i);
+    if (dupS) fail(`There are two sections named "${secs[names.indexOf(dupS)].name}". Section names must be different.`);
+    for (const x of secs) if (x.from && !cur.sections.includes(x.from)) fail('Settings changed somewhere else. Reload the page and try again.');
+
+    const subs = (b.subjects || []).filter(x => !blank(x.subject)).map(x => ({ subject: String(x.subject).trim(), units: +x.units, from: String(x.from || '').trim() }));
+    if (!subs.length) fail('A year level needs at least one subject.');
+    for (const x of subs) {
+      if (x.subject.length > MAX_NAME) fail(`Subject names can be at most ${MAX_NAME} characters.`);
+      if (!(x.units > 0 && x.units <= MAX_UNITS)) fail(`Units for "${x.subject}" must be more than 0 and at most ${MAX_UNITS}.`);
+    }
+    const subNames = subs.map(x => x.subject.toLowerCase());
+    const dup = subNames.find((n, i) => subNames.indexOf(n) !== i);
+    if (dup) fail(`"${subs[subNames.indexOf(dup)].subject}" is listed twice. Subjects must be different.`);
+
+    const yearIds = new Set(data.students.filter(s => s.year === year).map(s => s.id));
+    const gradedCount = subj => new Set(data.grades.filter(g => yearIds.has(g.student_id) && g.subject.toLowerCase() === subj.toLowerCase()).map(g => g.student_id)).size;
+
+    const keptSecs = new Set(secs.map(x => x.from).filter(Boolean));
+    const removedSections = cur.sections.filter(s => !keptSecs.has(s)).map(name => ({
+      name, students: data.students.filter(s => s.year === year && s.section === name).length,
+      registrations: data.registrations.filter(r => r.status === 'Pending' && +r.year === year && r.section === name).length }));
+    const blocked = removedSections.find(s => s.students);
+    if (blocked) fail(`Section ${blocked.name} still has ${blocked.students} student${blocked.students === 1 ? '' : 's'}. Move them to another section before removing it.`);
+    const renamedSections = secs.filter(x => x.from && x.from !== x.name).map(x => ({ from: x.from, to: x.name }));
+
+    const keptSubs = new Set(subs.map(x => x.from).filter(Boolean));
+    const removedSubjects = cur.subjects.filter(s => !keptSubs.has(s.subject)).map(s => ({ subject: s.subject, students: gradedCount(s.subject) }));
+    const renamedSubjects = subs.filter(x => x.from && x.from !== x.subject).map(x => ({ from: x.from, to: x.subject, students: gradedCount(x.from) }));
+    const unitChanges = subs.filter(x => x.from).map(x => ({ ...x, old: (cur.subjects.find(s => s.subject === x.from) || {}).units }))
+      .filter(x => x.old !== undefined && x.old !== x.units).map(x => ({ subject: x.subject, from: x.old, to: x.units, students: gradedCount(x.from) }));
+    return { secs, subs, removedSections, renamedSections, removedSubjects, renamedSubjects, unitChanges };
   }
 
   const routes = [
@@ -139,30 +192,34 @@
       return out;
     }],
     // body: { sections: [{ name, from }], subjects: [{ subject, units }] }. "from" is the old name when renaming (empty for new sections).
+    // Shows what a Settings change would affect, without saving it
+    ['POST', /^\/settings\/([1-4])\/preview$/, (m, b) => {
+      const p = planSettings(+m[1], b);
+      return { removedSections: p.removedSections, renamedSections: p.renamedSections, removedSubjects: p.removedSubjects,
+        renamedSubjects: p.renamedSubjects, unitChanges: p.unitChanges };
+    }],
+    // body: { sections: [{ name, from }], subjects: [{ subject, units, from }], removed_grades: 'keep' | 'delete' }
+    // "from" is the old name (empty for new rows). Renames carry over to students, grades and pending registrations.
     ['PUT', /^\/settings\/([1-4])$/, (m, b) => {
-      const year = +m[1], cur = data.settings[year];
-      const secs = (b.sections || []).map(x => ({ name: String(x.name || '').trim(), from: String(x.from || '').trim() }));
-      if (!secs.length) fail('A year level needs at least one section.');
-      if (secs.some(x => !x.name)) fail('Section names cannot be empty.');
-      const names = secs.map(x => x.name.toLowerCase());
-      if (new Set(names).size !== names.length) fail('Section names must be different.');
-      const kept = new Set(secs.map(x => x.from).filter(Boolean));
-      for (const old of cur.sections) if (!kept.has(old)) {
-        const n = data.students.filter(s => s.year === year && s.section === old).length;
-        if (n) fail(`Section ${old} still has ${n} student${n === 1 ? '' : 's'}. Move them to another section before removing it.`);
+      const year = +m[1], p = planSettings(year, b);
+      const yearIds = new Set(data.students.filter(s => s.year === year).map(s => s.id));
+      const secMap = Object.fromEntries(p.renamedSections.map(x => [x.from, x.to]));
+      for (const s of data.students) if (s.year === year && s.section in secMap) s.section = secMap[s.section];
+      const gone = new Set(p.removedSections.map(x => x.name));
+      for (const r of data.registrations) if (r.status === 'Pending' && +r.year === year) {
+        if (r.section in secMap) r.section = secMap[r.section];
+        else if (gone.has(r.section)) r.section = null; // falls back to "Auto" when approved
       }
-      const subjects = (b.subjects || []).filter(x => !blank(x.subject)).map(x => {
-        const units = +x.units;
-        if (!(units > 0)) fail(`Units for "${x.subject}" must be more than 0.`);
-        return { subject: String(x.subject).trim(), units };
-      });
-      const subjNames = subjects.map(x => x.subject.toLowerCase());
-      if (new Set(subjNames).size !== subjNames.length) fail('Subjects must be different.');
-      // rename sections on students and pending registrations
-      const rename = Object.fromEntries(secs.filter(x => x.from && x.from !== x.name).map(x => [x.from, x.name]));
-      for (const s of data.students) if (s.year === year && s.section in rename) s.section = rename[s.section];
-      for (const r of data.registrations) if (r.year === year && r.section in rename) r.section = rename[r.section];
-      data.settings[year] = { sections: secs.map(x => x.name), subjects };
+      const subMap = Object.fromEntries(p.renamedSubjects.map(x => [x.from.toLowerCase(), x.to]));
+      const unitMap = Object.fromEntries(p.subs.map(x => [x.subject.toLowerCase(), x.units]));
+      const removed = new Set(p.removedSubjects.map(x => x.subject.toLowerCase()));
+      data.grades = data.grades.filter(g => !(yearIds.has(g.student_id) && removed.has(g.subject.toLowerCase()) && b.removed_grades === 'delete'));
+      for (const g of data.grades) if (yearIds.has(g.student_id)) {
+        const k = g.subject.toLowerCase();
+        if (k in subMap) g.subject = subMap[k];
+        if (b.update_units !== false && g.subject.toLowerCase() in unitMap) g.units = unitMap[g.subject.toLowerCase()];
+      }
+      data.settings[year] = { sections: p.secs.map(x => x.name), subjects: p.subs.map(({ subject, units }) => ({ subject, units })) };
       save(); return { message: 'Saved' };
     }],
     ['GET', /^\/stats$/, () => {
@@ -269,7 +326,12 @@
     const method = (opt.method || 'GET').toUpperCase();
     for (const [verb, re, handler] of routes) {
       const m = path.match(re);
-      if (m && verb === method) return handler(m, opt.body || {});
+      if (!m || verb !== method) continue;
+      if (method === 'GET') return handler(m, opt.body || {});
+      // Changes are all-or-nothing: if anything fails, the data goes back to how it was
+      const before = JSON.stringify(data);
+      try { return handler(m, opt.body || {}); }
+      catch (e) { data = JSON.parse(before); if (e instanceof ApiError) throw e; console.error(e); throw new ApiError('Something went wrong, so nothing was changed. Please try again.'); }
     }
     throw new ApiError('Not found: ' + method + ' ' + path);
   };

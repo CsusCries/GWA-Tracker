@@ -121,3 +121,9 @@ dialog form{padding:26px 28px}dialog h3{margin:0 0 18px}
 .btn:disabled{opacity:.45;cursor:default}
 .cardgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
 .cardgrid .person{margin:0}
+
+.cflist{margin:0 0 12px;padding-left:20px;font-size:14px;line-height:1.55}.cflist:empty{display:none}.cflist li{margin-bottom:6px}
+.cfbox{background:#fff6e0;border:1px solid #f1d58a;border-radius:10px;padding:14px;font-size:14px}
+.radio{display:flex;gap:8px;align-items:center;font-weight:600;margin:6px 0 0;cursor:pointer}.radio input{width:auto;margin:0}
+.grow.extra input[data-k=subject]{border-color:#f1b56b;background:#fff8ec}
+.grow.extra::after{content:"Not in this year's curriculum";grid-column:1/-1;font-size:12px;font-weight:700;color:#9a6a00;margin:-4px 0 6px}
