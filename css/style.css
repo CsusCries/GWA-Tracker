@@ -1,3 +1,4 @@
+[hidden]{display:none!important}
 :root{--navy:#0d2c54;--teal:#0a7f8c;--cyan:#2fd8e0;--bg:#eef5fb;--card:#fff;--line:#d9e6ef;--text:#14365c;--muted:#5d7690;--soft:#f5fafd;--danger:#c0392b;--ok:#1f8a4c}
 *{box-sizing:border-box}
 body{margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);color:var(--text)}
@@ -127,3 +128,88 @@ dialog form{padding:26px 28px}dialog h3{margin:0 0 18px}
 .radio{display:flex;gap:8px;align-items:center;font-weight:600;margin:6px 0 0;cursor:pointer}.radio input{width:auto;margin:0}
 .grow.extra input[data-k=subject]{border-color:#f1b56b;background:#fff8ec}
 .grow.extra::after{content:"Not in this year's curriculum";grid-column:1/-1;font-size:12px;font-weight:700;color:#9a6a00;margin:-4px 0 6px}
+
+/* ---------- terms, header ---------- */
+.headright{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.termpick{display:flex;flex-direction:column;gap:4px;margin:0;font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.termpick select{margin:0;padding:8px 12px;font-size:14px;font-weight:700;color:var(--text);text-transform:none;letter-spacing:0;min-width:230px}
+.online.off{border-color:#f3b4ac;background:#fdecea;color:var(--danger)}
+.banner{background:#fff6e0;border:1px solid #f1d58a;color:#7a5600;border-radius:12px;padding:12px 16px;margin:-12px 0 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:14px}
+.banner .btn{margin-left:auto}
+
+/* ---------- shared bits ---------- */
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 14px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:0 14px}
+.muted{color:var(--muted)}
+.ok{color:var(--ok)}.bad{color:var(--danger)}.warnt{color:#9a6a00}
+.err{color:var(--danger);font-weight:600}
+.pre{white-space:pre-wrap;font:inherit;margin:0 0 12px}
+textarea{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:8px;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;color:var(--text);margin-bottom:12px;resize:vertical}
+input[type=file]{padding:9px}
+code{background:#eef3f8;border-radius:5px;padding:1px 5px;font-size:12px}
+label.inline{display:inline;margin:0;font-size:13px}
+select:disabled,input:disabled{background:#f3f6f9;color:#94a3b8;cursor:not-allowed}
+.stat.ok{border-left-color:var(--ok)}.stat.bad{border-left-color:var(--danger)}.stat.warn{border-left-color:#d9a300}
+.stat small i{font-style:normal;font-weight:600;opacity:.8}
+.stat.ok b{color:var(--ok)}.stat.bad b{color:var(--danger)}.stat.warn b{color:#9a6a00}
+
+/* toast with action */
+.toast{display:flex;gap:14px;align-items:center;pointer-events:none}
+.toast.show{pointer-events:auto}
+.toast button{background:none;border:0;color:var(--cyan);font:inherit;font-weight:800;cursor:pointer;padding:0}
+
+/* ---------- students ---------- */
+.statustabs,.semtabs{display:inline-flex;background:#eef3f8;border-radius:10px;padding:3px;margin-bottom:18px}
+.statustabs button,.semtabs button{font:inherit;font-size:14px;font-weight:700;border:0;background:none;color:var(--muted);padding:8px 16px;border-radius:8px;cursor:pointer}
+.statustabs button.active,.semtabs button.active{background:#fff;color:var(--text);box-shadow:0 1px 4px rgba(13,44,84,.12)}
+.bulkbar{position:sticky;top:8px;z-index:3;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--navy);color:#fff;border-radius:12px;padding:10px 14px;margin-bottom:14px;box-shadow:0 8px 20px rgba(13,44,84,.25)}
+.bulkbar select{margin:0;width:auto;padding:7px 10px;font-size:14px}
+.bulkbar .btn.ghost{background:rgba(255,255,255,.12);color:#fff}
+.stable input[type=checkbox]{width:16px;height:16px;margin:0;cursor:pointer}
+.stable tr.sel{background:#e9f8fa}
+.stable td.muted{font-size:13px}
+
+/* ---------- grade sheet ---------- */
+.gsinfo{display:flex;gap:10px 28px;flex-wrap:wrap;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.gsinfo:empty{display:none}
+.gsinfo span{display:flex;flex-direction:column;gap:2px}.gsinfo small{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.gsinfo a{color:var(--teal)}
+.gssum{display:flex;gap:8px 22px;flex-wrap:wrap;font-size:14px;margin-bottom:10px}
+.gin{width:96px;margin:0;padding:8px 10px;text-align:center;font-weight:700}
+.gin.changed{border-color:#3fb8c4;background:#effbfc}
+.gin.invalid{border-color:var(--danger);background:#fdecea;outline-color:var(--danger)}
+.gstable td.rm{font-weight:700;font-size:13px}
+
+/* ---------- teachers ---------- */
+.classes{display:flex;flex-wrap:wrap;gap:6px;max-width:420px}
+.classes .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 6px 4px 10px}
+.chip .x{border:0;background:#fdecea;color:var(--danger);border-radius:99px;width:18px;height:18px;font-size:10px;cursor:pointer;line-height:1}
+
+/* ---------- student dialog ---------- */
+.gwasum{display:flex;gap:10px;flex-wrap:wrap;margin:-6px 0 16px}.gwasum:empty{display:none}
+.gwasum span{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:6px 12px;font-size:13px;color:var(--muted)}
+.gwasum b{color:var(--text);margin-left:4px}
+.history{margin:0 0 14px;font-size:14px}.history summary{cursor:pointer;font-weight:700}
+.history table{margin-top:8px}.history td{padding:6px 8px}
+dialog{max-height:calc(100vh - 32px)}
+
+/* ---------- settings ---------- */
+.curterm{background:var(--soft);border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:12px;padding:12px 16px}
+.curterm small{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.curterm b{font-size:18px}
+.semtabs{margin-bottom:12px}
+
+/* ---------- print ---------- */
+.printonly{display:none}
+@media print{
+ body{background:#fff}
+ .hero,.nav,.pagehead,.banner,.noprint,.toast,dialog,.savebar,.gsinfo a{display:none!important}
+ .card{box-shadow:none;border:0;padding:0}
+ .printonly{display:block;margin-bottom:8px}
+ .gin{border:0;width:auto;padding:0;background:none}
+ table{font-size:12px}
+}
+
+@media(max-width:800px){.grid3,.grid4{grid-template-columns:1fr 1fr}.termpick select{min-width:0}}
+@media(max-width:600px){.grid3,.grid4{grid-template-columns:1fr}.headright{width:100%}.termpick{flex:1}}
