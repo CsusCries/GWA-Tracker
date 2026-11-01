@@ -64,6 +64,7 @@
    <div><label for="fsec">Section</label><select id="fsec"><option value="">All sections</option><option>A</option><option>B</option><option>C</option></select></div></div>
    <div class="grid2"><div><label for="fg">Gender</label><select id="fg"><option value="">All</option><option>Male</option><option>Female</option></select></div>
    <div><label for="fs">Sort within group</label><select id="fs"><option value="name">Last name</option><option value="gwa">GWA (best first)</option></select></div></div>
+   <div class="subjects" id="subjects"></div>
    <div id="tree"></div>
   </div>
  </section>
@@ -92,8 +93,8 @@
  <div class="grid2"><div><label>Student ID</label><input name="student_id" required placeholder="025-0001"></div><div><label>Email</label><input name="email" type="email" required></div></div>
  <div class="grid2"><div><label>Gender</label><select name="gender"><option>Male</option><option>Female</option></select></div>
  <div class="grid2" style="gap:0 8px"><div><label>Year</label><select name="year"><option>1</option><option>2</option><option>3</option><option>4</option></select></div><div><label>Section</label><select name="section"><option>A</option><option>B</option><option>C</option></select></div></div></div>
- <div id="gradesBox"><label>Grades <span style="font-weight:400;color:var(--muted)">(subject · units · grade 1.00–5.00) — GWA: <b id="liveGwa">–</b></span></label>
-  <div id="grades"></div><button type="button" class="btn ghost sm" id="addGrade" style="margin:4px 0 18px">+ Add subject</button></div>
+ <div id="gradesBox"><label>Grades · <span id="subjYear"></span> subjects <span style="font-weight:400;color:var(--muted)">(subject · units · grade 1.00–5.00) — GWA: <b id="liveGwa">–</b></span></label>
+  <div id="grades"></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 18px"><button type="button" class="btn ghost sm" id="addGrade">+ Add subject</button><button type="button" class="btn ghost sm" id="loadSubjects">Reset to year-level subjects</button></div></div>
  <p id="dsErr" style="color:var(--danger)"></p>
  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button><button class="btn" value="save">Save</button></div>
 </form></dialog>

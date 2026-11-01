@@ -43,6 +43,7 @@ function renderStudents(){
     return `<div class="ghead">${lab} (${p.length})</div>`+(p.map(s=>`<div class="person"><div><b>${esc(s.first_name+' '+s.last_name)}</b><small>Student ID: ${esc(s.student_id)}</small><small>Email: ${esc(s.email)}</small>${gwaTag(s.gwa)}</div>
      <div class="acts"><button class="btn sm" data-edit="${s.id}">Edit</button><button class="btn ghost sm" data-del="${s.id}">Delete</button></div></div>`).join('')||'<div class="empty" style="padding:6px">None</div>')}).join('')+'</div>'}).join('');
  const label=`${ord(y)} Year${sec?' · Section '+sec:''}${g?' · '+(g==='Male'?'Boys':'Girls'):''}`;
+ curriculum().then(c=>{const l=c[y]||[];$('#subjects').innerHTML=`<div class="subj-h">${ord(y)} Year subjects <span>${l.length} subjects · ${l.reduce((t,s)=>t+s.units,0)} units</span></div>`+l.map(s=>`<span class="chip">${esc(s.subject)} <i>${s.units}u</i></span>`).join('')});
  $('#tree').innerHTML=`<div class="yearhead">${label}<span class="count">${list.length} student${list.length===1?'':'s'}</span></div>`+
   (list.length||!filtering?`<div class="sections flat">${cards}</div>`:'<p class="empty">No students match your search in this year level.</p>');
  $('#tree').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editStudent(+b.dataset.edit));
@@ -57,14 +58,21 @@ function gradeRow(g={}){const d=document.createElement('div');d.className='grow'
 function readGrades(){return[...$('#grades').children].map(r=>Object.fromEntries([...r.querySelectorAll('input')].map(i=>[i.dataset.k,i.value])))}
 function liveGwa(){let w=0,u=0;readGrades().forEach(g=>{const gr=+g.grade,un=+g.units||0;if(g.subject&&gr){w+=gr*un;u+=un}});$('#liveGwa').textContent=u?(w/u).toFixed(2):'–'}
 $('#addGrade').onclick=()=>gradeRow({});
+// Subjects per year level, loaded once from the data layer
+let CURR=null;const curriculum=async()=>CURR||(CURR=await api('/curriculum'));
+// Fill the grade rows with the subjects of a year level, keeping any grades already typed for the same subject
+async function loadYearSubjects(year){const cur=Object.fromEntries(readGrades().map(g=>[g.subject.trim().toLowerCase(),g.grade]));
+ $('#grades').innerHTML='';for(const s of (await curriculum())[year]||[])gradeRow({...s,grade:cur[s.subject.toLowerCase()]??''});liveGwa()}
 async function editStudent(id){const f=$('#fStudent');f.reset();$('#dsErr').textContent='';$('#grades').innerHTML='';editingId=id;
  if(id){const s=await api('/students/'+id);for(const k of['first_name','last_name','student_id','email','gender','year','section'])f.elements[k].value=s[k];
-  s.grades.forEach(gradeRow);$('#dsTitle').textContent='Edit Student';$('#gradesBox').hidden=false}
- else{$('#dsTitle').textContent='Add Student';$('#gradesBox').hidden=true}
- liveGwa();$('#dStudent').showModal()}
+  if(s.grades.length)s.grades.forEach(gradeRow);else await loadYearSubjects(s.year);$('#dsTitle').textContent='Edit Student'}
+ else{f.elements.year.value=$('#fy').value;await loadYearSubjects(f.elements.year.value);$('#dsTitle').textContent='Add Student'}
+ $('#subjYear').textContent=ord(+f.elements.year.value)+' Year';liveGwa();$('#dStudent').showModal()}
+$('#fStudent').elements.year.onchange=e=>{$('#subjYear').textContent=ord(+e.target.value)+' Year';loadYearSubjects(e.target.value)};
+$('#loadSubjects').onclick=()=>{$('#grades').innerHTML='';loadYearSubjects($('#fStudent').elements.year.value)};
 $('#addStudent').onclick=()=>editStudent(null);
 $('#fStudent').onsubmit=async e=>{if(e.submitter?.value!=='save')return;e.preventDefault();
- const body=Object.fromEntries(new FormData(e.target));if(editingId)body.grades=readGrades();
+ const body=Object.fromEntries(new FormData(e.target));body.grades=readGrades();
  try{await api('/students'+(editingId?'/'+editingId:''),{method:editingId?'PUT':'POST',body});$('#dStudent').close();toast(editingId?'Student updated':'Student added');refresh()}catch(err){$('#dsErr').textContent=err.message}};
 async function delStudent(id){const s=STUDENTS.find(x=>x.id===id);if(!confirm(`Delete ${s?s.first_name+' '+s.last_name:'this student'}? This also removes their grades.`))return;
  try{await api('/students/'+id,{method:'DELETE'});toast('Student deleted');refresh()}catch(e){toast(e.message)}}

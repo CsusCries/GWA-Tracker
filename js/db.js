@@ -5,6 +5,7 @@
  * and per-device. The app only talks to the data through api(path, options),
  * using the same routes a real backend would expose:
  *
+ *   GET    /curriculum          (subjects and units per year level)
  *   GET    /stats
  *   GET    /students            POST /students
  *   GET    /students/:id        PUT  /students/:id   DELETE /students/:id
@@ -24,11 +25,21 @@
  *   }
  */
 (function () {
-  const KEY = 'gwa-tracker-data-v1';
+  const KEY = 'gwa-tracker-data-v2'; // v2: subjects depend on year level
   const SESSION = 'gwa-tracker-session';
   // Demo-only credentials. Anyone can read these, so this is not real security.
   const ADMIN_USER = 'admin', ADMIN_PASS = 'admin123';
-  const SUBJECTS = [['Programming', 3], ['Mathematics', 3], ['English', 3], ['Science', 3], ['Filipino', 3], ['PE', 2]];
+  // Subjects and units for each year level. Edit this list to match your curriculum.
+  const CURRICULUM = {
+    1: [['Introduction to Computing', 3], ['Computer Programming 1', 3], ['Mathematics in the Modern World', 3],
+        ['Purposive Communication', 3], ['Understanding the Self', 3], ['PE 1', 2], ['NSTP 1', 3]],
+    2: [['Data Structures and Algorithms', 3], ['Object-Oriented Programming', 3], ['Discrete Mathematics', 3],
+        ['Database Systems 1', 3], ['Networking 1', 3], ['Readings in Philippine History', 3], ['PE 3', 2]],
+    3: [['Web Systems and Technologies', 3], ['Information Management', 3], ['Systems Analysis and Design', 3],
+        ['Applications Development', 3], ['Information Assurance and Security', 3], ['Quantitative Methods', 3], ['Ethics', 3]],
+    4: [['Capstone Project 2', 3], ['Systems Administration and Maintenance', 3], ['Social and Professional Issues', 3],
+        ['IT Elective 4', 3], ['Practicum (OJT)', 6]],
+  };
 
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
@@ -54,7 +65,7 @@
         const s = { id: ++d.seq.s, student_id: `${prefix}-${num}`, first_name: pick(names), last_name: pick(lasts),
           email: `demo.student.${prefix}${num}@example.invalid`, gender, year, section };
         d.students.push(s);
-        for (const [subject, units] of SUBJECTS) d.grades.push({ id: ++d.seq.g, student_id: s.id, subject, units, grade: pick(grades) });
+        for (const [subject, units] of CURRICULUM[year]) d.grades.push({ id: ++d.seq.g, student_id: s.id, subject, units, grade: pick(grades) });
         n++;
       }
     }
@@ -99,7 +110,18 @@
       email: String(b.email).trim(), gender: b.gender, year: +b.year, section: String(b.section).toUpperCase() };
   }
 
+  // Keeps only rows with a subject and a grade; returns null when no grades were sent.
+  function parseGrades(list) {
+    if (!Array.isArray(list)) return null;
+    return list.filter(g => !blank(g.subject) && !blank(g.grade)).map(g => {
+      const grade = +g.grade, units = blank(g.units) ? 3 : +g.units;
+      if (!(grade >= 1 && grade <= 5) || !(units > 0)) fail('Grades must be 1.00-5.00 and units > 0');
+      return { subject: String(g.subject).trim(), units, grade };
+    });
+  }
+
   const routes = [
+    ['GET', /^\/curriculum$/, () => Object.fromEntries(Object.entries(CURRICULUM).map(([y, l]) => [y, l.map(([subject, units]) => ({ subject, units }))]))],
     ['GET', /^\/stats$/, () => {
       const by_year = { 1: { total: 0, Male: 0, Female: 0 }, 2: { total: 0, Male: 0, Female: 0 }, 3: { total: 0, Male: 0, Female: 0 }, 4: { total: 0, Male: 0, Female: 0 } };
       const list = data.students.map(withGwa);
@@ -123,7 +145,10 @@
     ['POST', /^\/students$/, (m, b) => {
       const f = studentFields(b);
       if (idTaken(f.student_id)) fail('Student ID already exists');
-      const s = { id: ++data.seq.s, ...f }; data.students.push(s); save(); return { id: s.id };
+      const grades = parseGrades(b.grades);
+      const s = { id: ++data.seq.s, ...f }; data.students.push(s);
+      if (grades) for (const g of grades) data.grades.push({ id: ++data.seq.g, student_id: s.id, ...g });
+      save(); return { id: s.id };
     }],
     ['GET', /^\/students\/(\d+)$/, m => {
       const s = findStudent(+m[1]);
@@ -132,18 +157,11 @@
     ['PUT', /^\/students\/(\d+)$/, (m, b) => {
       const s = findStudent(+m[1]), f = studentFields(b);
       if (idTaken(f.student_id, s.id)) fail('Student ID already exists');
-      let newGrades = null;
-      if (Array.isArray(b.grades)) {
-        newGrades = b.grades.filter(g => !blank(g.subject) && !blank(g.grade)).map(g => {
-          const grade = +g.grade, units = blank(g.units) ? 3 : +g.units;
-          if (!(grade >= 1 && grade <= 5) || !(units > 0)) fail('Grades must be 1.00-5.00 and units > 0');
-          return { student_id: s.id, subject: String(g.subject).trim(), units, grade };
-        });
-      }
+      const newGrades = parseGrades(b.grades);
       Object.assign(s, f);
       if (newGrades) {
         data.grades = data.grades.filter(g => g.student_id !== s.id);
-        for (const g of newGrades) data.grades.push({ id: ++data.seq.g, ...g });
+        for (const g of newGrades) data.grades.push({ id: ++data.seq.g, student_id: s.id, ...g });
       }
       save(); return { message: 'Updated' };
     }],
