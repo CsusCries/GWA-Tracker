@@ -29,27 +29,61 @@ document.querySelectorAll('.stat').forEach(b=>b.onclick=()=>{if(b.dataset.go==='
 
 // ---------- Students ----------
 async function loadStudents(){try{await settings();fillSections($('#fsec'),$('#fy').value,'All sections');STUDENTS=await api('/students');renderStudents()}catch(e){toast(e.message)}}
+// View state for the Students list: "table" (compact, for big sections) or "cards"; 25 students per page
+let VIEW='table',PAGE=1;const PER_PAGE=25;
+try{VIEW=localStorage.getItem('gwa-view')||'table'}catch(e){}
+const pct=(n,t)=>t?Math.round(n/t*100):0;
+const avg=l=>{const g=l.filter(s=>s.gwa!=null).map(s=>s.gwa);return g.length?(g.reduce((a,b)=>a+b,0)/g.length):null};
 function renderStudents(){
  const q=$('#q').value.trim().toLowerCase(),ln=$('#ln').value.trim().toLowerCase(),y=+$('#fy').value,sec=$('#fsec').value,g=$('#fg').value,sort=$('#fs').value;
  // "male"/"boy" and "female"/"girl" match gender exactly, so searching "male" doesn't also return females
  const gq={male:'Male',boy:'Male',boys:'Male',female:'Female',girl:'Female',girls:'Female'}[q];
  const list=STUDENTS.filter(s=>s.year===y&&(!sec||s.section===sec)&&(!g||s.gender===g)&&(!ln||s.last_name.toLowerCase().includes(ln))&&
   (!q||(gq?s.gender===gq:[s.first_name,s.last_name,s.first_name+' '+s.last_name,s.email,s.student_id,'section '+s.section].some(v=>v.toLowerCase().includes(q)))));
- const cmp=sort==='gwa'?(a,b)=>(a.gwa??9)-(b.gwa??9):(a,b)=>a.last_name.localeCompare(b.last_name)||a.first_name.localeCompare(b.first_name);
+ const cmp={name:(a,b)=>a.last_name.localeCompare(b.last_name)||a.first_name.localeCompare(b.first_name),
+  gwa:(a,b)=>(a.gwa??9)-(b.gwa??9),id:(a,b)=>a.student_id.localeCompare(b.student_id),
+  gender:(a,b)=>b.gender.localeCompare(a.gender),section:(a,b)=>a.section.localeCompare(b.section)}[sort]||((a,b)=>0);
  const filtering=q||ln;
- const secs=sec?[sec]:[...new Set([...(SET?.[y]?.sections||[]),...list.map(s=>s.section)])];
- const cards=secs.map(sc=>{const ss=list.filter(s=>s.section===sc);if(!ss.length&&filtering)return'';return `<div class="section"><div class="section-h">Section ${esc(sc)}<span class="count">${ss.length}</span></div>`+
-   [['Male','Boys'],['Female','Girls']].map(([gd,lab])=>{if(g&&g!==gd)return'';const p=ss.filter(s=>s.gender===gd).sort(cmp);
-    return `<div class="ghead">${lab} (${p.length})</div>`+(p.map(s=>`<div class="person"><div><b>${esc(s.first_name+' '+s.last_name)}</b><small>Student ID: ${esc(s.student_id)}</small><small>Email: ${esc(s.email)}</small>${gwaTag(s.gwa)}</div>
-     <div class="acts"><button class="btn sm" data-edit="${s.id}">Edit</button><button class="btn ghost sm" data-del="${s.id}">Delete</button></div></div>`).join('')||'<div class="empty" style="padding:6px">None</div>')}).join('')+'</div>'}).join('');
+ const secs=[...new Set([...(SET?.[y]?.sections||[]),...list.map(s=>s.section)])];
  const label=`${ord(y)} Year${sec?' · Section '+sec:''}${g?' · '+(g==='Male'?'Boys':'Girls'):''}`;
  curriculum().then(c=>{const l=c[y]||[];$('#subjects').innerHTML=`<div class="subj-h">${ord(y)} Year subjects <span>${l.length} subjects · ${l.reduce((t,s)=>t+s.units,0)} units</span></div>`+l.map(s=>`<span class="chip">${esc(s.subject)} <i>${s.units}u</i></span>`).join('')});
- $('#tree').innerHTML=`<div class="yearhead">${label}<span class="count">${list.length} student${list.length===1?'':'s'}</span></div>`+
-  (list.length||!filtering?`<div class="sections flat">${cards}</div>`:'<p class="empty">No students match your search in this year level.</p>');
+ const toggle=`<div class="viewtoggle" role="group" aria-label="View"><button data-view="table" class="${VIEW==='table'?'active':''}">Table</button><button data-view="cards" class="${VIEW==='cards'?'active':''}">Cards</button></div>`;
+ let body;
+ if(!sec&&!filtering){
+  // Overview: one summary card per section. Click to open the section.
+  body=`<p class="sub" style="margin:0 0 14px">Pick a section to see its students, or search above to look across all sections.</p><div class="secsum">`+secs.map(sc=>{
+   const ss=list.filter(s=>s.section===sc),m=ss.filter(s=>s.gender==='Male').length,f=ss.length-m,a=avg(ss),
+    hon=ss.filter(s=>s.gwa!=null&&s.gwa<=1.75).length,risk=ss.filter(s=>s.gwa!=null&&s.gwa>2.75).length;
+   return `<button class="secsum-card" data-open="${esc(sc)}"><div class="secsum-h">Section ${esc(sc)}<span class="count">${ss.length}</span></div>
+    <div class="bar"><i style="width:${pct(m,ss.length)}%"></i><i style="width:${ss.length?100-pct(m,ss.length):0}%"></i></div>
+    <div class="legend">${m} boys · ${f} girls</div>
+    <dl><div><dt>Avg GWA</dt><dd>${a==null?'–':a.toFixed(2)}</dd></div><div><dt>Honors</dt><dd class="ok">${hon}</dd></div><div><dt>At risk</dt><dd class="bad">${risk}</dd></div></dl>
+    <span class="open">View students →</span></button>`}).join('')+'</div>';
+ }else{
+  const sorted=[...list].sort(cmp),pages=Math.max(1,Math.ceil(sorted.length/PER_PAGE));PAGE=Math.min(Math.max(1,PAGE),pages);
+  const rows=sorted.slice((PAGE-1)*PER_PAGE,PAGE*PER_PAGE),from=sorted.length?(PAGE-1)*PER_PAGE+1:0,to=(PAGE-1)*PER_PAGE+rows.length;
+  const pager=pages>1?`<div class="pager"><span>Showing ${from}–${to} of ${sorted.length}</span><div><button class="btn ghost sm" data-page="${PAGE-1}" ${PAGE===1?'disabled':''}>‹ Previous</button>
+   <span class="pg">Page ${PAGE} of ${pages}</span><button class="btn ghost sm" data-page="${PAGE+1}" ${PAGE===pages?'disabled':''}>Next ›</button></div></div>`:`<div class="pager"><span>Showing ${sorted.length} student${sorted.length===1?'':'s'}</span></div>`;
+  const th=(k,t)=>`<th><button class="sortbtn ${sort===k?'on':''}" data-sort="${k}">${t}${sort===k?' ▾':''}</button></th>`;
+  if(!sorted.length)body='<p class="empty">No students match your filters in this year level.</p>';
+  else if(VIEW==='table')body=`<div class="scroll"><table class="stable"><thead><tr><th>#</th>${th('name','Name')}${th('id','Student ID')}${sec?'':th('section','Section')}${th('gender','Gender')}<th>Email</th>${th('gwa','GWA')}<th></th></tr></thead><tbody>`+
+   rows.map((s,i)=>`<tr><td class="num">${from+i}</td><td><b>${esc(s.last_name)}, ${esc(s.first_name)}</b></td><td>${esc(s.student_id)}</td>${sec?'':`<td>${esc(s.section)}</td>`}
+    <td><span class="gtag ${s.gender==='Male'?'m':'f'}">${s.gender==='Male'?'Boy':'Girl'}</span></td><td class="mail">${esc(s.email)}</td><td>${gwaTag(s.gwa).replace('GWA ','')}</td>
+    <td class="acts"><button class="btn sm" data-edit="${s.id}">Edit</button> <button class="btn ghost sm" data-del="${s.id}">Delete</button></td></tr>`).join('')+'</tbody></table></div>'+pager;
+  else body=`<div class="cardgrid">`+rows.map(s=>`<div class="person"><div><b>${esc(s.first_name+' '+s.last_name)}</b><small>Student ID: ${esc(s.student_id)}${sec?'':' · Section '+esc(s.section)}</small><small>Email: ${esc(s.email)}</small>${gwaTag(s.gwa)}</div>
+     <div class="acts"><button class="btn sm" data-edit="${s.id}">Edit</button><button class="btn ghost sm" data-del="${s.id}">Delete</button></div></div>`).join('')+'</div>'+pager;
+ }
+ const back=sec?`<button class="btn ghost sm" id="backAll">‹ All sections</button>`:'';
+ $('#tree').innerHTML=`<div class="yearhead"><span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${back}${label}<span class="count">${list.length} student${list.length===1?'':'s'}</span></span>${sec||filtering?toggle:''}</div>`+body;
  $('#tree').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editStudent(+b.dataset.edit));
  $('#tree').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delStudent(+b.dataset.del));
+ $('#tree').querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{$('#fsec').value=b.dataset.open;PAGE=1;renderStudents()});
+ $('#tree').querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{PAGE=+b.dataset.page;renderStudents();$('#tree').scrollIntoView({block:'start'})});
+ $('#tree').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{VIEW=b.dataset.view;try{localStorage.setItem('gwa-view',VIEW)}catch(e){}renderStudents()});
+ $('#tree').querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{$('#fs').value=b.dataset.sort;PAGE=1;renderStudents()});
+ $('#backAll')?.addEventListener('click',()=>{$('#fsec').value='';PAGE=1;renderStudents()});
 }
-['#q','#ln'].forEach(s=>$(s).oninput=renderStudents);['#fsec','#fg','#fs'].forEach(s=>$(s).onchange=renderStudents);$('#fy').onchange=()=>{fillSections($('#fsec'),$('#fy').value,'All sections');renderStudents()};
+const rerender=()=>{PAGE=1;renderStudents()};['#q','#ln'].forEach(s=>$(s).oninput=rerender);['#fsec','#fg','#fs'].forEach(s=>$(s).onchange=rerender);$('#fy').onchange=()=>{fillSections($('#fsec'),$('#fy').value,'All sections');rerender()};
 
 let editingId=null;
 function gradeRow(g={}){const d=document.createElement('div');d.className='grow';

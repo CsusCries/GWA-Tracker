@@ -97,3 +97,27 @@ dialog form{padding:26px 28px}dialog h3{margin:0 0 18px}
 .savebar .err{margin-right:auto}
 .dirty{color:#9a6a00;font-weight:700}
 @media(max-width:800px){.setgrid{grid-template-columns:1fr}}
+
+.yearhead{flex-wrap:wrap}
+.viewtoggle{display:inline-flex;background:#eef3f8;border-radius:10px;padding:3px}
+.viewtoggle button{font:inherit;font-size:13px;font-weight:700;border:0;background:none;color:var(--muted);padding:7px 14px;border-radius:8px;cursor:pointer}
+.viewtoggle button.active{background:#fff;color:var(--text);box-shadow:0 1px 4px rgba(13,44,84,.12)}
+.secsum{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.secsum-card{all:unset;box-sizing:border-box;cursor:pointer;background:var(--soft);border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:14px;padding:16px 18px;transition:transform .15s}
+.secsum-card:hover{transform:translateY(-2px);border-color:#3fb8c4;box-shadow:0 8px 18px rgba(13,44,84,.08)}
+.secsum-card:focus-visible{outline:2px solid #3fb8c4}
+.secsum-h{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:16px;margin-bottom:10px}
+.secsum-card dl{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0 10px}
+.secsum-card dt{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.secsum-card dd{margin:2px 0 0;font-weight:800;font-size:18px}.secsum-card dd.ok{color:var(--ok)}.secsum-card dd.bad{color:var(--danger)}
+.secsum-card .open{font-size:13px;font-weight:700;color:var(--teal)}
+.stable td,.stable th{padding:9px 10px}.stable tbody tr:hover{background:var(--soft)}
+.stable .num{color:var(--muted);width:36px}.stable .mail{color:var(--muted);font-size:13px}
+.stable .acts{white-space:nowrap;text-align:right}
+.sortbtn{all:unset;cursor:pointer;font:inherit;color:inherit}.sortbtn.on{color:var(--teal)}
+.gtag{font-size:12px;font-weight:700;padding:2px 9px;border-radius:99px}.gtag.m{background:#e3f2fa;color:#0b6c91}.gtag.f{background:#fbe8ef;color:#a3345c}
+.pager{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;color:var(--muted);font-size:14px}
+.pager>div{display:flex;gap:8px;align-items:center}.pager .pg{font-weight:700;color:var(--text)}
+.btn:disabled{opacity:.45;cursor:default}
+.cardgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+.cardgrid .person{margin:0}
