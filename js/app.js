@@ -6,10 +6,10 @@ function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');cl
 // All data calls go through api() in js/db.js. Swap that file for real fetch() calls when you add a database.
 const gwaTag=g=>g==null?'<span class="gwa">No grades</span>':`<span class="gwa ${g<=1.75?'hon':g>2.75?'risk':''}">GWA ${g.toFixed(2)}</span>`;
 
-const TITLES={dashboard:'Admin Dashboard',students:'Student Records',teachers:'Faculty Directory',registrations:'Registration Requests'};
+const TITLES={dashboard:'Admin Dashboard',students:'Student Records',teachers:'Faculty Directory',registrations:'Registration Requests',settings:'Section & Curriculum Settings'};
 function show(tab){document.querySelectorAll('.tab').forEach(s=>s.hidden=s.id!==tab);
  document.querySelectorAll('.nav [data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
- $('#pageTitle').textContent=TITLES[tab];history.replaceState(null,'','#'+tab);({dashboard:loadStats,students:loadStudents,teachers:loadTeachers,registrations:loadRegs})[tab]()}
+ $('#pageTitle').textContent=TITLES[tab];history.replaceState(null,'','#'+tab);({dashboard:loadStats,students:loadStudents,teachers:loadTeachers,registrations:loadRegs,settings:loadSettings})[tab]()}
 document.querySelectorAll('.nav [data-tab]').forEach(b=>b.onclick=()=>show(b.dataset.tab));
 
 // ---------- Dashboard ----------
@@ -20,7 +20,7 @@ async function loadStats(){try{const s=await api('/stats');
  $('#hon').textContent=s.honors;$('#risk').textContent=s.at_risk;
  $('#years').innerHTML=Object.entries(s.by_year).map(([y,b])=>`<button data-year="${y}"><b style="font-size:16px">${ord(+y)} Year</b><div style="font-size:26px;font-weight:800;margin:6px 0">${b.total}</div>
   <div class="bar"><i style="width:${b.total?b.Male/b.total*100:0}%"></i><i style="width:${b.total?b.Female/b.total*100:0}%"></i></div><span class="legend">${b.Male} male · ${b.Female} female</span></button>`).join('');
- $('#years').querySelectorAll('button').forEach(b=>b.onclick=()=>{$('#fy').value=b.dataset.year;$('#fsec').value='';$('#q').value='';$('#ln').value='';$('#fg').value='';show('students')});
+ $('#years').querySelectorAll('button').forEach(b=>b.onclick=()=>{$('#fy').value=b.dataset.year;$('#fsec').innerHTML='';$('#q').value='';$('#ln').value='';$('#fg').value='';show('students')});
  $('#top').innerHTML=s.top.map((t,i)=>`<tr><td>${i+1}</td><td><b>${esc(t.first_name+' '+t.last_name)}</b></td><td>${esc(t.student_id)}</td><td>${ord(t.year)} · ${esc(t.section)}</td><td>${gwaTag(t.gwa)}</td><td><button class="btn sm" data-edit="${t.id}">View</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No grades yet</td></tr>';
  $('#top').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editStudent(+b.dataset.edit));
  $('#online').textContent='System online';
@@ -28,27 +28,62 @@ async function loadStats(){try{const s=await api('/stats');
 document.querySelectorAll('.stat').forEach(b=>b.onclick=()=>{if(b.dataset.go==='students'){$('#fg').value=b.dataset.gender||'';if(b.dataset.sort)$('#fs').value=b.dataset.sort;$('#q').value='';$('#ln').value=''}show(b.dataset.go)});
 
 // ---------- Students ----------
-async function loadStudents(){try{STUDENTS=await api('/students');renderStudents()}catch(e){toast(e.message)}}
+async function loadStudents(){try{await settings();fillSections($('#fsec'),$('#fy').value,'All sections');STUDENTS=await api('/students');renderStudents()}catch(e){toast(e.message)}}
+// View state for the Students list: "table" (compact, for big sections) or "cards"; 25 students per page
+let VIEW='table',PAGE=1;const PER_PAGE=25;
+try{VIEW=localStorage.getItem('gwa-view')||'table'}catch(e){}
+const pct=(n,t)=>t?Math.round(n/t*100):0;
+const avg=l=>{const g=l.filter(s=>s.gwa!=null).map(s=>s.gwa);return g.length?(g.reduce((a,b)=>a+b,0)/g.length):null};
 function renderStudents(){
  const q=$('#q').value.trim().toLowerCase(),ln=$('#ln').value.trim().toLowerCase(),y=+$('#fy').value,sec=$('#fsec').value,g=$('#fg').value,sort=$('#fs').value;
  // "male"/"boy" and "female"/"girl" match gender exactly, so searching "male" doesn't also return females
  const gq={male:'Male',boy:'Male',boys:'Male',female:'Female',girl:'Female',girls:'Female'}[q];
  const list=STUDENTS.filter(s=>s.year===y&&(!sec||s.section===sec)&&(!g||s.gender===g)&&(!ln||s.last_name.toLowerCase().includes(ln))&&
   (!q||(gq?s.gender===gq:[s.first_name,s.last_name,s.first_name+' '+s.last_name,s.email,s.student_id,'section '+s.section].some(v=>v.toLowerCase().includes(q)))));
- const cmp=sort==='gwa'?(a,b)=>(a.gwa??9)-(b.gwa??9):(a,b)=>a.last_name.localeCompare(b.last_name)||a.first_name.localeCompare(b.first_name);
+ const cmp={name:(a,b)=>a.last_name.localeCompare(b.last_name)||a.first_name.localeCompare(b.first_name),
+  gwa:(a,b)=>(a.gwa??9)-(b.gwa??9),id:(a,b)=>a.student_id.localeCompare(b.student_id),
+  gender:(a,b)=>b.gender.localeCompare(a.gender),section:(a,b)=>a.section.localeCompare(b.section)}[sort]||((a,b)=>0);
  const filtering=q||ln;
- const secs=sec?[sec]:[...new Set(['A','B','C',...list.map(s=>s.section)])].sort();
- const cards=secs.map(sc=>{const ss=list.filter(s=>s.section===sc);if(!ss.length&&filtering)return'';return `<div class="section"><div class="section-h">Section ${esc(sc)}<span class="count">${ss.length}</span></div>`+
-   [['Male','Boys'],['Female','Girls']].map(([gd,lab])=>{if(g&&g!==gd)return'';const p=ss.filter(s=>s.gender===gd).sort(cmp);
-    return `<div class="ghead">${lab} (${p.length})</div>`+(p.map(s=>`<div class="person"><div><b>${esc(s.first_name+' '+s.last_name)}</b><small>Student ID: ${esc(s.student_id)}</small><small>Email: ${esc(s.email)}</small>${gwaTag(s.gwa)}</div>
-     <div class="acts"><button class="btn sm" data-edit="${s.id}">Edit</button><button class="btn ghost sm" data-del="${s.id}">Delete</button></div></div>`).join('')||'<div class="empty" style="padding:6px">None</div>')}).join('')+'</div>'}).join('');
+ const secs=[...new Set([...(SET?.[y]?.sections||[]),...list.map(s=>s.section)])];
  const label=`${ord(y)} Year${sec?' · Section '+sec:''}${g?' · '+(g==='Male'?'Boys':'Girls'):''}`;
- $('#tree').innerHTML=`<div class="yearhead">${label}<span class="count">${list.length} student${list.length===1?'':'s'}</span></div>`+
-  (list.length||!filtering?`<div class="sections flat">${cards}</div>`:'<p class="empty">No students match your search in this year level.</p>');
+ curriculum().then(c=>{const l=c[y]||[];$('#subjects').innerHTML=`<div class="subj-h">${ord(y)} Year subjects <span>${l.length} subjects · ${l.reduce((t,s)=>t+s.units,0)} units</span></div>`+l.map(s=>`<span class="chip">${esc(s.subject)} <i>${s.units}u</i></span>`).join('')});
+ const toggle=`<div class="viewtoggle" role="group" aria-label="View"><button data-view="table" class="${VIEW==='table'?'active':''}">Table</button><button data-view="cards" class="${VIEW==='cards'?'active':''}">Cards</button></div>`;
+ let body;
+ if(!sec&&!filtering){
+  // Overview: one summary card per section. Click to open the section.
+  body=`<p class="sub" style="margin:0 0 14px">Pick a section to see its students, or search above to look across all sections.</p><div class="secsum">`+secs.map(sc=>{
+   const ss=list.filter(s=>s.section===sc),m=ss.filter(s=>s.gender==='Male').length,f=ss.length-m,a=avg(ss),
+    hon=ss.filter(s=>s.gwa!=null&&s.gwa<=1.75).length,risk=ss.filter(s=>s.gwa!=null&&s.gwa>2.75).length;
+   return `<button class="secsum-card" data-open="${esc(sc)}"><div class="secsum-h">Section ${esc(sc)}<span class="count">${ss.length}</span></div>
+    <div class="bar"><i style="width:${pct(m,ss.length)}%"></i><i style="width:${ss.length?100-pct(m,ss.length):0}%"></i></div>
+    <div class="legend">${m} boys · ${f} girls</div>
+    <dl><div><dt>Avg GWA</dt><dd>${a==null?'–':a.toFixed(2)}</dd></div><div><dt>Honors</dt><dd class="ok">${hon}</dd></div><div><dt>At risk</dt><dd class="bad">${risk}</dd></div></dl>
+    <span class="open">View students →</span></button>`}).join('')+'</div>';
+ }else{
+  const sorted=[...list].sort(cmp),pages=Math.max(1,Math.ceil(sorted.length/PER_PAGE));PAGE=Math.min(Math.max(1,PAGE),pages);
+  const rows=sorted.slice((PAGE-1)*PER_PAGE,PAGE*PER_PAGE),from=sorted.length?(PAGE-1)*PER_PAGE+1:0,to=(PAGE-1)*PER_PAGE+rows.length;
+  const pager=pages>1?`<div class="pager"><span>Showing ${from}–${to} of ${sorted.length}</span><div><button class="btn ghost sm" data-page="${PAGE-1}" ${PAGE===1?'disabled':''}>‹ Previous</button>
+   <span class="pg">Page ${PAGE} of ${pages}</span><button class="btn ghost sm" data-page="${PAGE+1}" ${PAGE===pages?'disabled':''}>Next ›</button></div></div>`:`<div class="pager"><span>Showing ${sorted.length} student${sorted.length===1?'':'s'}</span></div>`;
+  const th=(k,t)=>`<th><button class="sortbtn ${sort===k?'on':''}" data-sort="${k}">${t}${sort===k?' ▾':''}</button></th>`;
+  if(!sorted.length)body='<p class="empty">No students match your filters in this year level.</p>';
+  else if(VIEW==='table')body=`<div class="scroll"><table class="stable"><thead><tr><th>#</th>${th('name','Name')}${th('id','Student ID')}${sec?'':th('section','Section')}${th('gender','Gender')}<th>Email</th>${th('gwa','GWA')}<th></th></tr></thead><tbody>`+
+   rows.map((s,i)=>`<tr><td class="num">${from+i}</td><td><b>${esc(s.last_name)}, ${esc(s.first_name)}</b></td><td>${esc(s.student_id)}</td>${sec?'':`<td>${esc(s.section)}</td>`}
+    <td><span class="gtag ${s.gender==='Male'?'m':'f'}">${s.gender==='Male'?'Boy':'Girl'}</span></td><td class="mail">${esc(s.email)}</td><td>${gwaTag(s.gwa).replace('GWA ','')}</td>
+    <td class="acts"><button class="btn sm" data-edit="${s.id}">Edit</button> <button class="btn ghost sm" data-del="${s.id}">Delete</button></td></tr>`).join('')+'</tbody></table></div>'+pager;
+  else body=`<div class="cardgrid">`+rows.map(s=>`<div class="person"><div><b>${esc(s.first_name+' '+s.last_name)}</b><small>Student ID: ${esc(s.student_id)}${sec?'':' · Section '+esc(s.section)}</small><small>Email: ${esc(s.email)}</small>${gwaTag(s.gwa)}</div>
+     <div class="acts"><button class="btn sm" data-edit="${s.id}">Edit</button><button class="btn ghost sm" data-del="${s.id}">Delete</button></div></div>`).join('')+'</div>'+pager;
+ }
+ const back=sec?`<button class="btn ghost sm" id="backAll">‹ All sections</button>`:'';
+ $('#tree').innerHTML=`<div class="yearhead"><span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${back}${label}<span class="count">${list.length} student${list.length===1?'':'s'}</span></span>${sec||filtering?toggle:''}</div>`+body;
  $('#tree').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editStudent(+b.dataset.edit));
  $('#tree').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delStudent(+b.dataset.del));
+ $('#tree').querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{$('#fsec').value=b.dataset.open;PAGE=1;renderStudents()});
+ $('#tree').querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{PAGE=+b.dataset.page;renderStudents();$('#tree').scrollIntoView({block:'start'})});
+ $('#tree').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{VIEW=b.dataset.view;try{localStorage.setItem('gwa-view',VIEW)}catch(e){}renderStudents()});
+ $('#tree').querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{$('#fs').value=b.dataset.sort;PAGE=1;renderStudents()});
+ $('#backAll')?.addEventListener('click',()=>{$('#fsec').value='';PAGE=1;renderStudents()});
 }
-['#q','#ln'].forEach(s=>$(s).oninput=renderStudents);['#fy','#fsec','#fg','#fs'].forEach(s=>$(s).onchange=renderStudents);
+const rerender=()=>{PAGE=1;renderStudents()};['#q','#ln'].forEach(s=>$(s).oninput=rerender);['#fsec','#fg','#fs'].forEach(s=>$(s).onchange=rerender);$('#fy').onchange=()=>{fillSections($('#fsec'),$('#fy').value,'All sections');rerender()};
 
 let editingId=null;
 function gradeRow(g={}){const d=document.createElement('div');d.className='grow';
@@ -57,14 +92,27 @@ function gradeRow(g={}){const d=document.createElement('div');d.className='grow'
 function readGrades(){return[...$('#grades').children].map(r=>Object.fromEntries([...r.querySelectorAll('input')].map(i=>[i.dataset.k,i.value])))}
 function liveGwa(){let w=0,u=0;readGrades().forEach(g=>{const gr=+g.grade,un=+g.units||0;if(g.subject&&gr){w+=gr*un;u+=un}});$('#liveGwa').textContent=u?(w/u).toFixed(2):'–'}
 $('#addGrade').onclick=()=>gradeRow({});
-async function editStudent(id){const f=$('#fStudent');f.reset();$('#dsErr').textContent='';$('#grades').innerHTML='';editingId=id;
- if(id){const s=await api('/students/'+id);for(const k of['first_name','last_name','student_id','email','gender','year','section'])f.elements[k].value=s[k];
-  s.grades.forEach(gradeRow);$('#dsTitle').textContent='Edit Student';$('#gradesBox').hidden=false}
- else{$('#dsTitle').textContent='Add Student';$('#gradesBox').hidden=true}
- liveGwa();$('#dStudent').showModal()}
+// Subjects per year level, loaded once from the data layer
+// Sections and subjects per year level (from the Settings tab), cached until settings are saved
+let SET=null;const settings=async()=>SET||(SET=await api('/settings'));
+const curriculum=async()=>Object.fromEntries(Object.entries(await settings()).map(([y,v])=>[y,v.subjects]));
+// Fill a <select> with the sections of a year level, keeping the current choice when it still exists
+function fillSections(sel,year,first){const keep=sel.value,secs=(SET?.[year]?.sections)||[];
+ sel.innerHTML=(first?`<option value="">${first}</option>`:'')+secs.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');
+ if([...sel.options].some(o=>o.value===keep))sel.value=keep}
+// Fill the grade rows with the subjects of a year level, keeping any grades already typed for the same subject
+async function loadYearSubjects(year){const cur=Object.fromEntries(readGrades().map(g=>[g.subject.trim().toLowerCase(),g.grade]));
+ $('#grades').innerHTML='';for(const s of (await curriculum())[year]||[])gradeRow({...s,grade:cur[s.subject.toLowerCase()]??''});liveGwa()}
+async function editStudent(id){const f=$('#fStudent');f.reset();$('#dsErr').textContent='';$('#grades').innerHTML='';editingId=id;await settings();
+ if(id){const s=await api('/students/'+id);for(const k of['first_name','last_name','student_id','email','gender','year'])f.elements[k].value=s[k];fillSections($('#stuSec'),s.year);$('#stuSec').value=s.section;
+  if(s.grades.length)s.grades.forEach(gradeRow);else await loadYearSubjects(s.year);$('#dsTitle').textContent='Edit Student'}
+ else{f.elements.year.value=$('#fy').value;fillSections($('#stuSec'),f.elements.year.value);if($('#fsec').value)$('#stuSec').value=$('#fsec').value;await loadYearSubjects(f.elements.year.value);$('#dsTitle').textContent='Add Student'}
+ $('#subjYear').textContent=ord(+f.elements.year.value)+' Year';liveGwa();$('#dStudent').showModal()}
+$('#fStudent').elements.year.onchange=e=>{fillSections($('#stuSec'),e.target.value);$('#subjYear').textContent=ord(+e.target.value)+' Year';loadYearSubjects(e.target.value)};
+$('#loadSubjects').onclick=()=>{$('#grades').innerHTML='';loadYearSubjects($('#fStudent').elements.year.value)};
 $('#addStudent').onclick=()=>editStudent(null);
 $('#fStudent').onsubmit=async e=>{if(e.submitter?.value!=='save')return;e.preventDefault();
- const body=Object.fromEntries(new FormData(e.target));if(editingId)body.grades=readGrades();
+ const body=Object.fromEntries(new FormData(e.target));body.grades=readGrades();
  try{await api('/students'+(editingId?'/'+editingId:''),{method:editingId?'PUT':'POST',body});$('#dStudent').close();toast(editingId?'Student updated':'Student added');refresh()}catch(err){$('#dsErr').textContent=err.message}};
 async function delStudent(id){const s=STUDENTS.find(x=>x.id===id);if(!confirm(`Delete ${s?s.first_name+' '+s.last_name:'this student'}? This also removes their grades.`))return;
  try{await api('/students/'+id,{method:'DELETE'});toast('Student deleted');refresh()}catch(e){toast(e.message)}}
@@ -93,9 +141,39 @@ function renderRegs(){const f=$('#rf').value,l=REGS.filter(r=>!f||r.status===f);
  $('#rlist').querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{try{await api(`/registrations/${b.dataset.id}/${b.dataset.a}`,{method:'POST'});toast(b.dataset.a==='approve'?'Approved and added':'Registration rejected');loadRegs()}catch(e){toast(e.message)}})}
 $('#rf').onchange=renderRegs;
 $('#regRole').onchange=e=>{const s=e.target.value==='Student';$('#regStu').hidden=!s;$('#regTea').hidden=s};
-$('#addReg').onclick=()=>{$('#fReg').reset();$('#regRole').onchange({target:$('#regRole')});$('#drErr').textContent='';$('#dReg').showModal()};
+$('#fReg').elements.year.onchange=e=>fillSections($('#regSec'),e.target.value,'Auto');
+$('#addReg').onclick=async()=>{await settings();$('#fReg').reset();fillSections($('#regSec'),$('#fReg').elements.year.value,'Auto');$('#regRole').onchange({target:$('#regRole')});$('#drErr').textContent='';$('#dReg').showModal()};
 $('#fReg').onsubmit=async e=>{if(e.submitter?.value!=='save')return;e.preventDefault();
  try{await api('/registrations',{method:'POST',body:Object.fromEntries(new FormData(e.target))});$('#dReg').close();toast('Registration submitted');$('#rf').value='Pending';loadRegs()}catch(err){$('#drErr').textContent=err.message}};
+
+// ---------- Settings: sections and curriculum per year level ----------
+let setYear=1,draft=null;
+async function loadSettings(){try{SET=null;await settings();pickSetYear(setYear)}catch(e){toast(e.message)}}
+function pickSetYear(y){setYear=+y;const s=SET[y];
+ draft={sections:s.sections.map(n=>({name:n,from:n,count:s.counts?.[n]||0})),subjects:s.subjects.map(x=>({...x}))};
+ $('#setErr').textContent='';renderSettings()}
+function renderSettings(){
+ document.querySelectorAll('#setYears button').forEach(b=>b.classList.toggle('active',+b.dataset.y===setYear));
+ $('#secTitle').textContent=`${ord(setYear)} Year Sections`;$('#curTitle').textContent=`${ord(setYear)} Year Curriculum`;
+ $('#secList').innerHTML=draft.sections.map((s,i)=>`<div class="secrow"><input data-i="${i}" value="${esc(s.name)}" placeholder="Section name" aria-label="Section name">
+  <small>${s.from?`${s.count} student${s.count===1?'':'s'}`:'new'}</small><button type="button" class="btn danger sm" data-rm="${i}" title="Remove section">✕</button></div>`).join('')||'<p class="empty">No sections. Add one.</p>';
+ $('#subList').innerHTML=draft.subjects.map((s,i)=>`<div class="subrow"><input data-i="${i}" data-k="subject" value="${esc(s.subject)}" placeholder="Subject name" aria-label="Subject">
+  <input data-i="${i}" data-k="units" type="number" min="0.5" step="0.5" value="${s.units}" aria-label="Units"><button type="button" class="btn danger sm" data-rm="${i}" title="Remove subject">✕</button></div>`).join('')||'<p class="empty">No subjects. Add one.</p>';
+ sumUnits();
+ $('#secList').querySelectorAll('input').forEach(i=>i.oninput=()=>{draft.sections[i.dataset.i].name=i.value});
+ $('#secList').querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{const s=draft.sections[b.dataset.rm];
+  if(s.count){$('#setErr').textContent=`Section ${s.from} has ${s.count} student${s.count===1?'':'s'}. Move them to another section first.`;return}
+  draft.sections.splice(b.dataset.rm,1);renderSettings()});
+ $('#subList').querySelectorAll('input').forEach(i=>i.oninput=()=>{draft.subjects[i.dataset.i][i.dataset.k]=i.dataset.k==='units'?+i.value:i.value;sumUnits()});
+ $('#subList').querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{draft.subjects.splice(b.dataset.rm,1);renderSettings()})}
+function sumUnits(){const l=draft.subjects.filter(s=>s.subject.trim());$('#curSum').textContent=`${l.length} subject${l.length===1?'':'s'} · ${l.reduce((t,s)=>t+(+s.units||0),0)} units. New students in this year level start with these subjects. Grades already saved are not changed.`}
+$('#setYears').querySelectorAll('button').forEach(b=>b.onclick=()=>pickSetYear(b.dataset.y));
+$('#addSec').onclick=()=>{draft.sections.push({name:'',from:'',count:0});renderSettings();$('#secList').querySelector('.secrow:last-child input').focus()};
+$('#addSub').onclick=()=>{draft.subjects.push({subject:'',units:3});renderSettings();$('#subList').querySelector('.subrow:last-child input').focus()};
+$('#setReset').onclick=()=>pickSetYear(setYear);
+$('#setSave').onclick=async()=>{$('#setErr').textContent='';
+ try{await api('/settings/'+setYear,{method:'PUT',body:{sections:draft.sections.map(({name,from})=>({name,from})),subjects:draft.subjects}});
+  toast(`${ord(setYear)} Year settings saved`);SET=null;await settings();pickSetYear(setYear)}catch(e){$('#setErr').textContent=e.message}};
 
 function refresh(){const t=location.hash.slice(1);show(TITLES[t]?t:'dashboard')}
 
