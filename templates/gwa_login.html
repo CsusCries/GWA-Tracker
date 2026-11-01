@@ -1,0 +1,11 @@
+<!DOCTYPE html><html lang="en"><head>{% include '_gwa_head.html' %}<title>Admin Login</title></head><body>
+{% include '_gwa_hero.html' %}
+<div class="wrap" style="max-width:440px;margin-top:40px">
+ <form class="card" method="post">
+  <h3>Admin Sign In</h3><p class="sub">Use your admin credentials to manage the GWA tracker.</p>
+  {% if error %}<p style="color:var(--danger);font-weight:600">{{ error }}</p>{% endif %}
+  <label for="u">Username</label><input id="u" name="username" autocomplete="username" required>
+  <label for="p">Password</label><input id="p" name="password" type="password" autocomplete="current-password" required>
+  <button class="btn" style="width:100%">Sign in</button>
+ </form>
+</div></body></html>
