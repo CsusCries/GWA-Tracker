@@ -1,0 +1,233 @@
+<!DOCTYPE html><html lang="en"><head>{% include '_gwa_head.html' %}<title>GWA Tracking System</title>
+<style>
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+.stat{background:var(--soft);border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:14px;padding:18px 20px;cursor:pointer;text-align:left;font:inherit;color:inherit;transition:transform .15s}
+.stat:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(13,44,84,.08)}
+.stat small{color:var(--muted);font-weight:600}.stat b{display:block;font-size:30px;margin-top:6px}
+.bar{display:flex;height:10px;border-radius:99px;overflow:hidden;background:#e3edf4;margin:6px 0 4px}
+.bar i{display:block;background:#1192b8}.bar i+i{background:#e2789a}
+.yr{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.yr button{all:unset;cursor:pointer;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:16px}
+.yr button:hover{border-color:#3fb8c4}
+.legend{font-size:13px;color:var(--muted)}
+.legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;background:#1192b8}
+.legend span+span::before{background:#e2789a}
+details.year{background:#f0f6fa;border:1px solid var(--line);border-radius:12px;margin-bottom:16px}
+details.year>summary{cursor:pointer;padding:16px 18px;font-weight:700;list-style:none}
+details.year>summary::before{content:"▶ ";font-size:12px}details.year[open]>summary::before{content:"▼ "}
+.sections{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;padding:0 14px 16px}
+.section{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}
+.section-h{display:flex;justify-content:space-between;font-weight:800;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:12px}
+.count{background:#e6f7ef;color:var(--ok);border-radius:99px;min-width:26px;text-align:center;font-size:12px;padding:3px 8px}
+.ghead{color:#0b5a6e;font-weight:700;font-size:13px;margin:10px 0 8px}
+.person{display:flex;gap:10px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--soft)}
+.person b{display:block;margin-bottom:3px}.person small{display:block;color:var(--muted);font-size:13px;word-break:break-all}
+.person .acts{display:flex;gap:6px;flex:none}
+.gwa{display:inline-block;margin-top:5px;font-weight:700;font-size:12px;padding:2px 8px;border-radius:99px;background:#e6f2ff;color:#1d4f91}
+.gwa.hon{background:#e6f7ef;color:var(--ok)}.gwa.risk{background:#fdecea;color:var(--danger)}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+.tag{font-size:12px;font-weight:700;padding:3px 9px;border-radius:99px;background:#fff6e0;color:#9a6a00}.tag.Approved{background:#e6f7ef;color:var(--ok)}.tag.Rejected{background:#fdecea;color:var(--danger)}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}.toolbar h3{margin:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+dialog{border:0;border-radius:16px;padding:0;width:min(560px,calc(100vw - 32px));box-shadow:0 30px 60px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(13,44,84,.45)}
+dialog form{padding:26px 28px}dialog h3{margin:0 0 18px}
+.grow{display:grid;grid-template-columns:1fr 70px 80px 34px;gap:8px;align-items:start}.grow input{margin-bottom:8px;padding:9px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;opacity:0;transition:.25s;pointer-events:none;z-index:9}.toast.show{opacity:1}
+.empty{color:var(--muted);text-align:center;padding:20px}
+.scroll{overflow-x:auto}
+@media(max-width:600px){.stats{grid-template-columns:1fr 1fr}.card{padding:20px 16px}.grid2{grid-template-columns:1fr}.logo{display:none}.person{flex-direction:column;align-items:stretch}}
+</style></head><body>
+{% include '_gwa_hero.html' %}
+<div class="wrap">
+ <nav class="nav">
+  <button data-tab="dashboard">Dashboard</button><button data-tab="teachers">Teachers</button>
+  <button data-tab="students">Students</button><button data-tab="registrations">Registrations</button>
+  <form method="post" action="/logout" style="margin-left:auto"><button class="logout" type="submit">Logout</button></form>
+ </nav>
+ <div class="pagehead"><div><span class="pill">OPERATIONS</span><h2 id="pageTitle">Admin Dashboard</h2></div><span class="online" id="online">System online</span></div>
+
+ <section id="dashboard" class="tab">
+  <div class="card">
+   <h3>Overview</h3><p class="sub">Click any tile to jump to the matching list.</p>
+   <div class="stats">
+    <button class="stat" data-go="students" data-gender=""><small>Total Students</small><b id="sTotal">–</b></button>
+    <button class="stat" data-go="students" data-gender="Male"><small>Male</small><b id="sMale">–</b></button>
+    <button class="stat" data-go="students" data-gender="Female"><small>Female</small><b id="sFemale">–</b></button>
+    <button class="stat" data-go="teachers"><small>Teachers</small><b id="sTeachers">–</b></button>
+    <button class="stat" data-go="registrations"><small>Pending Registrations</small><b id="sPending">–</b></button>
+    <button class="stat" data-go="students" data-sort="gwa"><small>Average GWA</small><b id="sAvg">–</b></button>
+   </div>
+   <p class="legend"><span>Male</span> &nbsp; <span>Female</span></p>
+   <div class="bar"><i id="barM"></i><i id="barF"></i></div>
+   <p class="legend" id="barTxt"></p>
+  </div>
+  <div class="card"><h3>Students per Year Level</h3><p class="sub">Click a year level to open it in the Students list.</p><div class="yr" id="years"></div></div>
+  <div class="card"><h3>Top Performers</h3><p class="sub">Lowest GWA is best (1.00 = highest). Honors: GWA ≤ 1.75 · At risk: GWA &gt; 2.75 — <b id="hon"></b> honors, <b id="risk"></b> at risk.</p>
+   <div class="scroll"><table><thead><tr><th>#</th><th>Name</th><th>ID</th><th>Year / Sec</th><th>GWA</th><th></th></tr></thead><tbody id="top"></tbody></table></div></div>
+ </section>
+
+ <section id="students" class="tab" hidden>
+  <div class="card">
+   <div class="toolbar"><h3>Students by Year, Section, and Gender</h3><button class="btn" id="addStudent">+ Add Student</button></div>
+   <p class="sub">Students are grouped by year level, section, and gender. Sections A, B, and C are balanced within each year level.</p>
+   <label for="q">Search Student</label><input id="q" placeholder="Search by name, email, ID, year, section, or gender">
+   <label for="ln">Filter by Last Name</label><input id="ln" placeholder="Enter a last name">
+   <div class="grid2"><div><label for="fg">Gender</label><select id="fg"><option value="">All</option><option>Male</option><option>Female</option></select></div>
+   <div><label for="fs">Sort within group</label><select id="fs"><option value="name">Last name</option><option value="gwa">GWA (best first)</option></select></div></div>
+   <div id="tree"></div>
+  </div>
+ </section>
+
+ <section id="teachers" class="tab" hidden>
+  <div class="card">
+   <div class="toolbar"><h3>Teachers</h3><button class="btn" id="addTeacher">+ Add Teacher</button></div>
+   <label for="tq">Search Teacher</label><input id="tq" placeholder="Search by name, email, department, or subject">
+   <div class="scroll"><table><thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Subject</th><th></th></tr></thead><tbody id="tlist"></tbody></table></div>
+  </div>
+ </section>
+
+ <section id="registrations" class="tab" hidden>
+  <div class="card">
+   <div class="toolbar"><h3>Registrations</h3><button class="btn" id="addReg">+ New Registration</button></div>
+   <p class="sub">Approving a student registration adds them to the least-filled section of their year level if no section was given.</p>
+   <label for="rf">Status</label><select id="rf"><option value="">All</option><option selected>Pending</option><option>Approved</option><option>Rejected</option></select>
+   <div class="scroll"><table><thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Details</th><th>Status</th><th></th></tr></thead><tbody id="rlist"></tbody></table></div>
+  </div>
+ </section>
+</div>
+
+<dialog id="dStudent"><form method="dialog" id="fStudent">
+ <h3 id="dsTitle">Student</h3>
+ <div class="grid2"><div><label>First name</label><input name="first_name" required></div><div><label>Last name</label><input name="last_name" required></div></div>
+ <div class="grid2"><div><label>Student ID</label><input name="student_id" required placeholder="025-0001"></div><div><label>Email</label><input name="email" type="email" required></div></div>
+ <div class="grid2"><div><label>Gender</label><select name="gender"><option>Male</option><option>Female</option></select></div>
+ <div class="grid2" style="gap:0 8px"><div><label>Year</label><select name="year"><option>1</option><option>2</option><option>3</option><option>4</option></select></div><div><label>Section</label><select name="section"><option>A</option><option>B</option><option>C</option></select></div></div></div>
+ <div id="gradesBox"><label>Grades <span style="font-weight:400;color:var(--muted)">(subject · units · grade 1.00–5.00) — GWA: <b id="liveGwa">–</b></span></label>
+  <div id="grades"></div><button type="button" class="btn ghost sm" id="addGrade" style="margin:4px 0 18px">+ Add subject</button></div>
+ <p id="dsErr" style="color:var(--danger)"></p>
+ <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button><button class="btn" value="save">Save</button></div>
+</form></dialog>
+
+<dialog id="dTeacher"><form method="dialog" id="fTeacher"><h3 id="dtTitle">Teacher</h3>
+ <label>Name</label><input name="name" required><label>Email</label><input name="email" type="email" required>
+ <div class="grid2"><div><label>Department</label><input name="department"></div><div><label>Subject</label><input name="subject"></div></div>
+ <p id="dtErr" style="color:var(--danger)"></p>
+ <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button><button class="btn" value="save">Save</button></div>
+</form></dialog>
+
+<dialog id="dReg"><form method="dialog" id="fReg"><h3>New Registration</h3>
+ <label>Role</label><select name="role" id="regRole"><option>Student</option><option>Teacher</option></select>
+ <div class="grid2"><div><label>First name</label><input name="first_name" required></div><div><label>Last name</label><input name="last_name" required></div></div>
+ <label>Email</label><input name="email" type="email" required>
+ <div id="regStu" class="grid2"><div><label>Gender</label><select name="gender"><option>Male</option><option>Female</option></select></div>
+  <div class="grid2" style="gap:0 8px"><div><label>Year</label><select name="year"><option>1</option><option>2</option><option>3</option><option>4</option></select></div><div><label>Section</label><select name="section"><option value="">Auto</option><option>A</option><option>B</option><option>C</option></select></div></div></div>
+ <div id="regTea" hidden><label>Subject</label><input name="subject"></div>
+ <p id="drErr" style="color:var(--danger)"></p>
+ <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button><button class="btn" value="save">Submit</button></div>
+</form></dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s), API='/gwa/api';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ord=y=>['','1st','2nd','3rd','4th'][y]||y+'th';
+let STUDENTS=[],TEACHERS=[],REGS=[];
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2200)}
+async function api(path,opt={}){const r=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opt,body:opt.body&&JSON.stringify(opt.body)});
+ if(r.status===401){location.href='/login';throw 0}const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Request failed');return d}
+const gwaTag=g=>g==null?'<span class="gwa">No grades</span>':`<span class="gwa ${g<=1.75?'hon':g>2.75?'risk':''}">GWA ${g.toFixed(2)}</span>`;
+
+const TITLES={dashboard:'Admin Dashboard',students:'Student Records',teachers:'Faculty Directory',registrations:'Registration Requests'};
+function show(tab){document.querySelectorAll('.tab').forEach(s=>s.hidden=s.id!==tab);
+ document.querySelectorAll('.nav [data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+ $('#pageTitle').textContent=TITLES[tab];history.replaceState(null,'','#'+tab);({dashboard:loadStats,students:loadStudents,teachers:loadTeachers,registrations:loadRegs})[tab]()}
+document.querySelectorAll('.nav [data-tab]').forEach(b=>b.onclick=()=>show(b.dataset.tab));
+
+// ---------- Dashboard ----------
+async function loadStats(){try{const s=await api('/stats');
+ $('#sTotal').textContent=s.total;$('#sMale').textContent=s.male;$('#sFemale').textContent=s.female;$('#sTeachers').textContent=s.teachers;$('#sPending').textContent=s.pending;$('#sAvg').textContent=s.average_gwa?.toFixed(2)??'–';
+ const pm=s.total?s.male/s.total*100:0;$('#barM').style.width=pm+'%';$('#barF').style.width=(s.total?100-pm:0)+'%';
+ $('#barTxt').textContent=`${s.male} male (${pm.toFixed(0)}%) · ${s.female} female (${(s.total?100-pm:0).toFixed(0)}%)`;
+ $('#hon').textContent=s.honors;$('#risk').textContent=s.at_risk;
+ $('#years').innerHTML=Object.entries(s.by_year).map(([y,b])=>`<button data-year="${y}"><b style="font-size:16px">${ord(+y)} Year</b><div style="font-size:26px;font-weight:800;margin:6px 0">${b.total}</div>
+  <div class="bar"><i style="width:${b.total?b.Male/b.total*100:0}%"></i><i style="width:${b.total?b.Female/b.total*100:0}%"></i></div><span class="legend">${b.Male} male · ${b.Female} female</span></button>`).join('');
+ $('#years').querySelectorAll('button').forEach(b=>b.onclick=()=>{openYear=+b.dataset.year;$('#q').value='';$('#ln').value='';$('#fg').value='';show('students')});
+ $('#top').innerHTML=s.top.map((t,i)=>`<tr><td>${i+1}</td><td><b>${esc(t.first_name+' '+t.last_name)}</b></td><td>${esc(t.student_id)}</td><td>${ord(t.year)} · ${esc(t.section)}</td><td>${gwaTag(t.gwa)}</td><td><button class="btn sm" data-edit="${t.id}">View</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No grades yet</td></tr>';
+ $('#top').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editStudent(+b.dataset.edit));
+ $('#online').textContent='System online';
+}catch(e){if(e)$('#online').textContent='Offline'}}
+document.querySelectorAll('.stat').forEach(b=>b.onclick=()=>{if(b.dataset.go==='students'){$('#fg').value=b.dataset.gender||'';if(b.dataset.sort)$('#fs').value=b.dataset.sort;$('#q').value='';$('#ln').value=''}show(b.dataset.go)});
+
+// ---------- Students ----------
+let openYear=null;
+async function loadStudents(){try{STUDENTS=await api('/students');renderStudents()}catch(e){e&&toast(e.message)}}
+function renderStudents(){
+ const q=$('#q').value.trim().toLowerCase(),ln=$('#ln').value.trim().toLowerCase(),g=$('#fg').value,sort=$('#fs').value;
+ const list=STUDENTS.filter(s=>(!g||s.gender===g)&&(!ln||s.last_name.toLowerCase().includes(ln))&&(!q||[s.first_name,s.last_name,s.first_name+' '+s.last_name,s.email,s.student_id,ord(s.year)+' year','year '+s.year,'section '+s.section,s.gender,s.gender==='Male'?'boy':'girl'].some(v=>v.toLowerCase().includes(q))));
+ const cmp=sort==='gwa'?(a,b)=>(a.gwa??9)-(b.gwa??9):(a,b)=>a.last_name.localeCompare(b.last_name)||a.first_name.localeCompare(b.first_name);
+ const filtering=q||ln||g;let html='';
+ for(const y of [1,2,3,4]){const ys=list.filter(s=>s.year===y);if(!ys.length&&filtering)continue;
+  const secs=[...new Set(['A','B','C',...ys.map(s=>s.section)])].sort();
+  html+=`<details class="year" data-y="${y}" ${(filtering||openYear===y||openYear===null&&y===1)?'open':''}><summary>${ord(y)} Year (${ys.length})</summary><div class="sections">`+
+  secs.map(sec=>{const ss=ys.filter(s=>s.section===sec);if(!ss.length&&filtering)return'';return `<div class="section"><div class="section-h">Section ${esc(sec)}<span class="count">${ss.length}</span></div>`+
+   [['Male','Boys'],['Female','Girls']].map(([gd,lab])=>{const p=ss.filter(s=>s.gender===gd).sort(cmp);if(g&&g!==gd)return'';
+    return `<div class="ghead">${lab} (${p.length})</div>`+(p.map(s=>`<div class="person"><div><b>${esc(s.first_name+' '+s.last_name)}</b><small>Student ID: ${esc(s.student_id)}</small><small>Email: ${esc(s.email)}</small>${gwaTag(s.gwa)}</div>
+     <div class="acts"><button class="btn sm" data-edit="${s.id}">Edit</button><button class="btn ghost sm" data-del="${s.id}">Delete</button></div></div>`).join('')||'<div class="empty" style="padding:6px">None</div>')}).join('')+'</div>'}).join('')+'</div></details>'}
+ $('#tree').innerHTML=html||'<p class="empty">No students match your search.</p>';
+ $('#tree').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editStudent(+b.dataset.edit));
+ $('#tree').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delStudent(+b.dataset.del));
+ $('#tree').querySelectorAll('details').forEach(d=>d.ontoggle=()=>{if(d.open&&!filtering)openYear=+d.dataset.y});
+}
+['#q','#ln'].forEach(s=>$(s).oninput=renderStudents);['#fg','#fs'].forEach(s=>$(s).onchange=renderStudents);
+
+let editingId=null;
+function gradeRow(g={}){const d=document.createElement('div');d.className='grow';
+ d.innerHTML=`<input placeholder="Subject" value="${esc(g.subject)}" data-k="subject"><input type="number" min="0.5" step="0.5" placeholder="Units" value="${g.units??3}" data-k="units"><input type="number" min="1" max="5" step="0.25" placeholder="Grade" value="${g.grade??''}" data-k="grade"><button type="button" class="btn danger sm" title="Remove">✕</button>`;
+ d.querySelector('button').onclick=()=>{d.remove();liveGwa()};d.oninput=liveGwa;$('#grades').append(d)}
+function readGrades(){return[...$('#grades').children].map(r=>Object.fromEntries([...r.querySelectorAll('input')].map(i=>[i.dataset.k,i.value])))}
+function liveGwa(){let w=0,u=0;readGrades().forEach(g=>{const gr=+g.grade,un=+g.units||0;if(g.subject&&gr){w+=gr*un;u+=un}});$('#liveGwa').textContent=u?(w/u).toFixed(2):'–'}
+$('#addGrade').onclick=()=>gradeRow({});
+async function editStudent(id){const f=$('#fStudent');f.reset();$('#dsErr').textContent='';$('#grades').innerHTML='';editingId=id;
+ if(id){const s=await api('/students/'+id);for(const k of['first_name','last_name','student_id','email','gender','year','section'])f.elements[k].value=s[k];
+  s.grades.forEach(gradeRow);$('#dsTitle').textContent='Edit Student';$('#gradesBox').hidden=false}
+ else{$('#dsTitle').textContent='Add Student';$('#gradesBox').hidden=true}
+ liveGwa();$('#dStudent').showModal()}
+$('#addStudent').onclick=()=>editStudent(null);
+$('#fStudent').onsubmit=async e=>{if(e.submitter?.value!=='save')return;e.preventDefault();
+ const body=Object.fromEntries(new FormData(e.target));if(editingId)body.grades=readGrades();
+ try{await api('/students'+(editingId?'/'+editingId:''),{method:editingId?'PUT':'POST',body});$('#dStudent').close();toast(editingId?'Student updated':'Student added');refresh()}catch(err){$('#dsErr').textContent=err.message}};
+async function delStudent(id){const s=STUDENTS.find(x=>x.id===id);if(!confirm(`Delete ${s?s.first_name+' '+s.last_name:'this student'}? This also removes their grades.`))return;
+ try{await api('/students/'+id,{method:'DELETE'});toast('Student deleted');refresh()}catch(e){e&&toast(e.message)}}
+
+// ---------- Teachers ----------
+async function loadTeachers(){try{TEACHERS=await api('/teachers');renderTeachers()}catch(e){e&&toast(e.message)}}
+function renderTeachers(){const q=$('#tq').value.trim().toLowerCase();
+ const l=TEACHERS.filter(t=>!q||[t.name,t.email,t.department,t.subject].some(v=>(v||'').toLowerCase().includes(q)));
+ $('#tlist').innerHTML=l.map(t=>`<tr><td><b>${esc(t.name)}</b></td><td>${esc(t.email)}</td><td>${esc(t.department||'—')}</td><td>${esc(t.subject||'—')}</td><td style="white-space:nowrap"><button class="btn sm" data-e="${t.id}">Edit</button> <button class="btn ghost sm" data-d="${t.id}">Delete</button></td></tr>`).join('')||'<tr><td colspan="5" class="empty">No teachers found</td></tr>';
+ $('#tlist').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>editTeacher(+b.dataset.e));
+ $('#tlist').querySelectorAll('[data-d]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this teacher?'))return;await api('/teachers/'+b.dataset.d,{method:'DELETE'});toast('Teacher deleted');loadTeachers()})}
+$('#tq').oninput=renderTeachers;
+let tEdit=null;
+function editTeacher(id){const f=$('#fTeacher');f.reset();$('#dtErr').textContent='';tEdit=id;const t=TEACHERS.find(x=>x.id===id);
+ if(t)for(const k of['name','email','department','subject'])f.elements[k].value=t[k]||'';$('#dtTitle').textContent=t?'Edit Teacher':'Add Teacher';$('#dTeacher').showModal()}
+$('#addTeacher').onclick=()=>editTeacher(null);
+$('#fTeacher').onsubmit=async e=>{if(e.submitter?.value!=='save')return;e.preventDefault();
+ try{await api('/teachers'+(tEdit?'/'+tEdit:''),{method:tEdit?'PUT':'POST',body:Object.fromEntries(new FormData(e.target))});$('#dTeacher').close();toast('Teacher saved');loadTeachers()}catch(err){$('#dtErr').textContent=err.message}};
+
+// ---------- Registrations ----------
+async function loadRegs(){try{REGS=await api('/registrations');renderRegs()}catch(e){e&&toast(e.message)}}
+function renderRegs(){const f=$('#rf').value,l=REGS.filter(r=>!f||r.status===f);
+ $('#rlist').innerHTML=l.map(r=>`<tr><td><b>${esc(r.first_name+' '+r.last_name)}</b></td><td>${esc(r.role)}</td><td>${esc(r.email)}</td>
+  <td>${r.role==='Student'?`${esc(r.gender||'')} · ${ord(r.year||1)} Year · Sec ${esc(r.section||'Auto')}`:esc(r.subject||'—')}</td><td><span class="tag ${r.status}">${r.status}</span></td>
+  <td style="white-space:nowrap">${r.status==='Pending'?`<button class="btn sm" data-a="approve" data-id="${r.id}">Approve</button> <button class="btn danger sm" data-a="reject" data-id="${r.id}">Reject</button>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No registrations</td></tr>';
+ $('#rlist').querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{try{await api(`/registrations/${b.dataset.id}/${b.dataset.a}`,{method:'POST'});toast(b.dataset.a==='approve'?'Approved and added':'Registration rejected');loadRegs()}catch(e){e&&toast(e.message)}})}
+$('#rf').onchange=renderRegs;
+$('#regRole').onchange=e=>{const s=e.target.value==='Student';$('#regStu').hidden=!s;$('#regTea').hidden=s};
+$('#addReg').onclick=()=>{$('#fReg').reset();$('#regRole').onchange({target:$('#regRole')});$('#drErr').textContent='';$('#dReg').showModal()};
+$('#fReg').onsubmit=async e=>{if(e.submitter?.value!=='save')return;e.preventDefault();
+ try{await api('/registrations',{method:'POST',body:Object.fromEntries(new FormData(e.target))});$('#dReg').close();toast('Registration submitted');$('#rf').value='Pending';loadRegs()}catch(err){$('#drErr').textContent=err.message}};
+
+function refresh(){const t=location.hash.slice(1);show(TITLES[t]?t:'dashboard')}
+refresh();
+</script></body></html>
