@@ -58,8 +58,10 @@
   <div class="card">
    <div class="toolbar"><h3>Students by Year, Section, and Gender</h3><button class="btn" id="addStudent">+ Add Student</button></div>
    <p class="sub">Students are grouped by year level, section, and gender. Sections A, B, and C are balanced within each year level.</p>
-   <label for="q">Search Student</label><input id="q" placeholder="Search by name, email, ID, year, section, or gender">
+   <label for="q">Search Student</label><input id="q" placeholder="Search by name, email, ID, section, or gender">
    <label for="ln">Filter by Last Name</label><input id="ln" placeholder="Enter a last name">
+   <div class="grid2"><div><label for="fy">Year Level</label><select id="fy"><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div>
+   <div><label for="fsec">Section</label><select id="fsec"><option value="">All sections</option><option>A</option><option>B</option><option>C</option></select></div></div>
    <div class="grid2"><div><label for="fg">Gender</label><select id="fg"><option value="">All</option><option>Male</option><option>Female</option></select></div>
    <div><label for="fs">Sort within group</label><select id="fs"><option value="name">Last name</option><option value="gwa">GWA (best first)</option></select></div></div>
    <div id="tree"></div>

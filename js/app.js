@@ -20,7 +20,7 @@ async function loadStats(){try{const s=await api('/stats');
  $('#hon').textContent=s.honors;$('#risk').textContent=s.at_risk;
  $('#years').innerHTML=Object.entries(s.by_year).map(([y,b])=>`<button data-year="${y}"><b style="font-size:16px">${ord(+y)} Year</b><div style="font-size:26px;font-weight:800;margin:6px 0">${b.total}</div>
   <div class="bar"><i style="width:${b.total?b.Male/b.total*100:0}%"></i><i style="width:${b.total?b.Female/b.total*100:0}%"></i></div><span class="legend">${b.Male} male · ${b.Female} female</span></button>`).join('');
- $('#years').querySelectorAll('button').forEach(b=>b.onclick=()=>{openYear=+b.dataset.year;$('#q').value='';$('#ln').value='';$('#fg').value='';show('students')});
+ $('#years').querySelectorAll('button').forEach(b=>b.onclick=()=>{$('#fy').value=b.dataset.year;$('#fsec').value='';$('#q').value='';$('#ln').value='';$('#fg').value='';show('students')});
  $('#top').innerHTML=s.top.map((t,i)=>`<tr><td>${i+1}</td><td><b>${esc(t.first_name+' '+t.last_name)}</b></td><td>${esc(t.student_id)}</td><td>${ord(t.year)} · ${esc(t.section)}</td><td>${gwaTag(t.gwa)}</td><td><button class="btn sm" data-edit="${t.id}">View</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No grades yet</td></tr>';
  $('#top').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editStudent(+b.dataset.edit));
  $('#online').textContent='System online';
@@ -28,26 +28,27 @@ async function loadStats(){try{const s=await api('/stats');
 document.querySelectorAll('.stat').forEach(b=>b.onclick=()=>{if(b.dataset.go==='students'){$('#fg').value=b.dataset.gender||'';if(b.dataset.sort)$('#fs').value=b.dataset.sort;$('#q').value='';$('#ln').value=''}show(b.dataset.go)});
 
 // ---------- Students ----------
-let openYear=null;
 async function loadStudents(){try{STUDENTS=await api('/students');renderStudents()}catch(e){toast(e.message)}}
 function renderStudents(){
- const q=$('#q').value.trim().toLowerCase(),ln=$('#ln').value.trim().toLowerCase(),g=$('#fg').value,sort=$('#fs').value;
- const list=STUDENTS.filter(s=>(!g||s.gender===g)&&(!ln||s.last_name.toLowerCase().includes(ln))&&(!q||[s.first_name,s.last_name,s.first_name+' '+s.last_name,s.email,s.student_id,ord(s.year)+' year','year '+s.year,'section '+s.section,s.gender,s.gender==='Male'?'boy':'girl'].some(v=>v.toLowerCase().includes(q))));
+ const q=$('#q').value.trim().toLowerCase(),ln=$('#ln').value.trim().toLowerCase(),y=+$('#fy').value,sec=$('#fsec').value,g=$('#fg').value,sort=$('#fs').value;
+ // "male"/"boy" and "female"/"girl" match gender exactly, so searching "male" doesn't also return females
+ const gq={male:'Male',boy:'Male',boys:'Male',female:'Female',girl:'Female',girls:'Female'}[q];
+ const list=STUDENTS.filter(s=>s.year===y&&(!sec||s.section===sec)&&(!g||s.gender===g)&&(!ln||s.last_name.toLowerCase().includes(ln))&&
+  (!q||(gq?s.gender===gq:[s.first_name,s.last_name,s.first_name+' '+s.last_name,s.email,s.student_id,'section '+s.section].some(v=>v.toLowerCase().includes(q)))));
  const cmp=sort==='gwa'?(a,b)=>(a.gwa??9)-(b.gwa??9):(a,b)=>a.last_name.localeCompare(b.last_name)||a.first_name.localeCompare(b.first_name);
- const filtering=q||ln||g;let html='';
- for(const y of [1,2,3,4]){const ys=list.filter(s=>s.year===y);if(!ys.length&&filtering)continue;
-  const secs=[...new Set(['A','B','C',...ys.map(s=>s.section)])].sort();
-  html+=`<details class="year" data-y="${y}" ${(filtering||openYear===y||openYear===null&&y===1)?'open':''}><summary>${ord(y)} Year (${ys.length})</summary><div class="sections">`+
-  secs.map(sec=>{const ss=ys.filter(s=>s.section===sec);if(!ss.length&&filtering)return'';return `<div class="section"><div class="section-h">Section ${esc(sec)}<span class="count">${ss.length}</span></div>`+
-   [['Male','Boys'],['Female','Girls']].map(([gd,lab])=>{const p=ss.filter(s=>s.gender===gd).sort(cmp);if(g&&g!==gd)return'';
+ const filtering=q||ln;
+ const secs=sec?[sec]:[...new Set(['A','B','C',...list.map(s=>s.section)])].sort();
+ const cards=secs.map(sc=>{const ss=list.filter(s=>s.section===sc);if(!ss.length&&filtering)return'';return `<div class="section"><div class="section-h">Section ${esc(sc)}<span class="count">${ss.length}</span></div>`+
+   [['Male','Boys'],['Female','Girls']].map(([gd,lab])=>{if(g&&g!==gd)return'';const p=ss.filter(s=>s.gender===gd).sort(cmp);
     return `<div class="ghead">${lab} (${p.length})</div>`+(p.map(s=>`<div class="person"><div><b>${esc(s.first_name+' '+s.last_name)}</b><small>Student ID: ${esc(s.student_id)}</small><small>Email: ${esc(s.email)}</small>${gwaTag(s.gwa)}</div>
-     <div class="acts"><button class="btn sm" data-edit="${s.id}">Edit</button><button class="btn ghost sm" data-del="${s.id}">Delete</button></div></div>`).join('')||'<div class="empty" style="padding:6px">None</div>')}).join('')+'</div>'}).join('')+'</div></details>'}
- $('#tree').innerHTML=html||'<p class="empty">No students match your search.</p>';
+     <div class="acts"><button class="btn sm" data-edit="${s.id}">Edit</button><button class="btn ghost sm" data-del="${s.id}">Delete</button></div></div>`).join('')||'<div class="empty" style="padding:6px">None</div>')}).join('')+'</div>'}).join('');
+ const label=`${ord(y)} Year${sec?' · Section '+sec:''}${g?' · '+(g==='Male'?'Boys':'Girls'):''}`;
+ $('#tree').innerHTML=`<div class="yearhead">${label}<span class="count">${list.length} student${list.length===1?'':'s'}</span></div>`+
+  (list.length||!filtering?`<div class="sections flat">${cards}</div>`:'<p class="empty">No students match your search in this year level.</p>');
  $('#tree').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editStudent(+b.dataset.edit));
  $('#tree').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delStudent(+b.dataset.del));
- $('#tree').querySelectorAll('details').forEach(d=>d.ontoggle=()=>{if(d.open&&!filtering)openYear=+d.dataset.y});
 }
-['#q','#ln'].forEach(s=>$(s).oninput=renderStudents);['#fg','#fs'].forEach(s=>$(s).onchange=renderStudents);
+['#q','#ln'].forEach(s=>$(s).oninput=renderStudents);['#fy','#fsec','#fg','#fs'].forEach(s=>$(s).onchange=renderStudents);
 
 let editingId=null;
 function gradeRow(g={}){const d=document.createElement('div');d.className='grow';

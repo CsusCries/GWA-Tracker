@@ -74,3 +74,6 @@ dialog form{padding:26px 28px}dialog h3{margin:0 0 18px}
 
 .login-wrap{max-width:440px;margin:40px auto}
 .err{color:var(--danger);font-weight:600}
+.yearhead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:4px 0 14px;font-weight:800;font-size:17px}
+.yearhead .count{font-size:13px}
+.sections.flat{padding:0}
