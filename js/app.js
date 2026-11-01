@@ -10,7 +10,7 @@ const TITLES={dashboard:'Admin Dashboard',students:'Student Records',teachers:'F
 function show(tab){document.querySelectorAll('.tab').forEach(s=>s.hidden=s.id!==tab);
  document.querySelectorAll('.nav [data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
  $('#pageTitle').textContent=TITLES[tab];history.replaceState(null,'','#'+tab);({dashboard:loadStats,students:loadStudents,teachers:loadTeachers,registrations:loadRegs,settings:loadSettings})[tab]()}
-document.querySelectorAll('.nav [data-tab]').forEach(b=>b.onclick=()=>show(b.dataset.tab));
+document.querySelectorAll('.nav [data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab!=='settings'&&!leaveSettingsOk())return;show(b.dataset.tab)});
 
 // ---------- Dashboard ----------
 async function loadStats(){try{const s=await api('/stats');
@@ -86,9 +86,13 @@ function renderStudents(){
 const rerender=()=>{PAGE=1;renderStudents()};['#q','#ln'].forEach(s=>$(s).oninput=rerender);['#fsec','#fg','#fs'].forEach(s=>$(s).onchange=rerender);$('#fy').onchange=()=>{fillSections($('#fsec'),$('#fy').value,'All sections');rerender()};
 
 let editingId=null;
-function gradeRow(g={}){const d=document.createElement('div');d.className='grow';
+function gradeRow(g={}){const d=document.createElement('div');d.className='grow';d.dataset.subject=g.subject||'';
  d.innerHTML=`<input placeholder="Subject" value="${esc(g.subject)}" data-k="subject"><input type="number" min="0.5" step="0.5" placeholder="Units" value="${g.units??3}" data-k="units"><input type="number" min="1" max="5" step="0.25" placeholder="Grade" value="${g.grade??''}" data-k="grade"><button type="button" class="btn danger sm" title="Remove">✕</button>`;
- d.querySelector('button').onclick=()=>{d.remove();liveGwa()};d.oninput=liveGwa;$('#grades').append(d)}
+ d.querySelector('button').onclick=()=>{d.remove();liveGwa()};d.oninput=()=>{liveGwa();flagExtraSubjects()};$('#grades').append(d)}
+// Mark grade rows whose subject isn't in the student's year-level curriculum (e.g. removed in Settings)
+async function flagExtraSubjects(){const y=$('#fStudent').elements.year.value,l=((await curriculum())[y]||[]).map(s=>s.subject.toLowerCase());
+ [...$('#grades').children].forEach(r=>{const v=r.querySelector('[data-k=subject]').value.trim().toLowerCase();r.classList.toggle('extra',!!v&&!l.includes(v));
+  r.title=r.classList.contains('extra')?'Not in this year level\'s curriculum':''})}
 function readGrades(){return[...$('#grades').children].map(r=>Object.fromEntries([...r.querySelectorAll('input')].map(i=>[i.dataset.k,i.value])))}
 function liveGwa(){let w=0,u=0;readGrades().forEach(g=>{const gr=+g.grade,un=+g.units||0;if(g.subject&&gr){w+=gr*un;u+=un}});$('#liveGwa').textContent=u?(w/u).toFixed(2):'–'}
 $('#addGrade').onclick=()=>gradeRow({});
@@ -102,12 +106,12 @@ function fillSections(sel,year,first){const keep=sel.value,secs=(SET?.[year]?.se
  if([...sel.options].some(o=>o.value===keep))sel.value=keep}
 // Fill the grade rows with the subjects of a year level, keeping any grades already typed for the same subject
 async function loadYearSubjects(year){const cur=Object.fromEntries(readGrades().map(g=>[g.subject.trim().toLowerCase(),g.grade]));
- $('#grades').innerHTML='';for(const s of (await curriculum())[year]||[])gradeRow({...s,grade:cur[s.subject.toLowerCase()]??''});liveGwa()}
+ $('#grades').innerHTML='';for(const s of (await curriculum())[year]||[])gradeRow({...s,grade:cur[s.subject.toLowerCase()]??''});liveGwa();flagExtraSubjects()}
 async function editStudent(id){const f=$('#fStudent');f.reset();$('#dsErr').textContent='';$('#grades').innerHTML='';editingId=id;await settings();
  if(id){const s=await api('/students/'+id);for(const k of['first_name','last_name','student_id','email','gender','year'])f.elements[k].value=s[k];fillSections($('#stuSec'),s.year);$('#stuSec').value=s.section;
   if(s.grades.length)s.grades.forEach(gradeRow);else await loadYearSubjects(s.year);$('#dsTitle').textContent='Edit Student'}
  else{f.elements.year.value=$('#fy').value;fillSections($('#stuSec'),f.elements.year.value);if($('#fsec').value)$('#stuSec').value=$('#fsec').value;await loadYearSubjects(f.elements.year.value);$('#dsTitle').textContent='Add Student'}
- $('#subjYear').textContent=ord(+f.elements.year.value)+' Year';liveGwa();$('#dStudent').showModal()}
+ $('#subjYear').textContent=ord(+f.elements.year.value)+' Year';liveGwa();flagExtraSubjects();$('#dStudent').showModal()}
 $('#fStudent').elements.year.onchange=e=>{fillSections($('#stuSec'),e.target.value);$('#subjYear').textContent=ord(+e.target.value)+' Year';loadYearSubjects(e.target.value)};
 $('#loadSubjects').onclick=()=>{$('#grades').innerHTML='';loadYearSubjects($('#fStudent').elements.year.value)};
 $('#addStudent').onclick=()=>editStudent(null);
@@ -147,10 +151,13 @@ $('#fReg').onsubmit=async e=>{if(e.submitter?.value!=='save')return;e.preventDef
  try{await api('/registrations',{method:'POST',body:Object.fromEntries(new FormData(e.target))});$('#dReg').close();toast('Registration submitted');$('#rf').value='Pending';loadRegs()}catch(err){$('#drErr').textContent=err.message}};
 
 // ---------- Settings: sections and curriculum per year level ----------
-let setYear=1,draft=null;
+let setYear=1,draft=null,draftStart='';
+const settingsDirty=()=>!!draft&&JSON.stringify(draft)!==draftStart;
+function leaveSettingsOk(){return $('#settings').hidden||!settingsDirty()||confirm(`You have unsaved changes to ${ord(setYear)} Year settings. Leave without saving?`)}
+window.addEventListener('beforeunload',e=>{if(!$('#settings').hidden&&settingsDirty()){e.preventDefault();e.returnValue=''}});
 async function loadSettings(){try{SET=null;await settings();pickSetYear(setYear)}catch(e){toast(e.message)}}
 function pickSetYear(y){setYear=+y;const s=SET[y];
- draft={sections:s.sections.map(n=>({name:n,from:n,count:s.counts?.[n]||0})),subjects:s.subjects.map(x=>({...x}))};
+ draft={sections:s.sections.map(n=>({name:n,from:n,count:s.counts?.[n]||0})),subjects:s.subjects.map(x=>({...x,from:x.subject}))};draftStart=JSON.stringify(draft);
  $('#setErr').textContent='';renderSettings()}
 function renderSettings(){
  document.querySelectorAll('#setYears button').forEach(b=>b.classList.toggle('active',+b.dataset.y===setYear));
@@ -160,20 +167,38 @@ function renderSettings(){
  $('#subList').innerHTML=draft.subjects.map((s,i)=>`<div class="subrow"><input data-i="${i}" data-k="subject" value="${esc(s.subject)}" placeholder="Subject name" aria-label="Subject">
   <input data-i="${i}" data-k="units" type="number" min="0.5" step="0.5" value="${s.units}" aria-label="Units"><button type="button" class="btn danger sm" data-rm="${i}" title="Remove subject">✕</button></div>`).join('')||'<p class="empty">No subjects. Add one.</p>';
  sumUnits();
- $('#secList').querySelectorAll('input').forEach(i=>i.oninput=()=>{draft.sections[i.dataset.i].name=i.value});
+ $('#secList').querySelectorAll('input').forEach(i=>i.oninput=()=>{draft.sections[i.dataset.i].name=i.value;markDirty()});
  $('#secList').querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{const s=draft.sections[b.dataset.rm];
   if(s.count){$('#setErr').textContent=`Section ${s.from} has ${s.count} student${s.count===1?'':'s'}. Move them to another section first.`;return}
   draft.sections.splice(b.dataset.rm,1);renderSettings()});
  $('#subList').querySelectorAll('input').forEach(i=>i.oninput=()=>{draft.subjects[i.dataset.i][i.dataset.k]=i.dataset.k==='units'?+i.value:i.value;sumUnits()});
  $('#subList').querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{draft.subjects.splice(b.dataset.rm,1);renderSettings()})}
-function sumUnits(){const l=draft.subjects.filter(s=>s.subject.trim());$('#curSum').textContent=`${l.length} subject${l.length===1?'':'s'} · ${l.reduce((t,s)=>t+(+s.units||0),0)} units. New students in this year level start with these subjects. Grades already saved are not changed.`}
-$('#setYears').querySelectorAll('button').forEach(b=>b.onclick=()=>pickSetYear(b.dataset.y));
+function markDirty(){$('#setSave').textContent=settingsDirty()?'Save settings •':'Save settings'}
+function sumUnits(){markDirty();const l=draft.subjects.filter(s=>s.subject.trim());$('#curSum').textContent=`${l.length} subject${l.length===1?'':'s'} · ${l.reduce((t,s)=>t+(+s.units||0),0)} units. New students in this year level start with these subjects. Grades already saved are not changed.`}
+$('#setYears').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(+b.dataset.y===setYear)return;if(settingsDirty()&&!confirm(`You have unsaved changes to ${ord(setYear)} Year settings. Switch years and discard them?`))return;pickSetYear(b.dataset.y)});
 $('#addSec').onclick=()=>{draft.sections.push({name:'',from:'',count:0});renderSettings();$('#secList').querySelector('.secrow:last-child input').focus()};
-$('#addSub').onclick=()=>{draft.subjects.push({subject:'',units:3});renderSettings();$('#subList').querySelector('.subrow:last-child input').focus()};
-$('#setReset').onclick=()=>pickSetYear(setYear);
-$('#setSave').onclick=async()=>{$('#setErr').textContent='';
- try{await api('/settings/'+setYear,{method:'PUT',body:{sections:draft.sections.map(({name,from})=>({name,from})),subjects:draft.subjects}});
-  toast(`${ord(setYear)} Year settings saved`);SET=null;await settings();pickSetYear(setYear)}catch(e){$('#setErr').textContent=e.message}};
+$('#addSub').onclick=()=>{draft.subjects.push({subject:'',units:3,from:''});renderSettings();$('#subList').querySelector('.subrow:last-child input').focus()};
+$('#setReset').onclick=()=>{if(settingsDirty()&&!confirm('Discard your unsaved changes?'))return;pickSetYear(setYear)};
+function settingsBody(extra={}){return{sections:draft.sections.map(({name,from})=>({name,from})),subjects:draft.subjects.map(({subject,units,from})=>({subject,units,from})),...extra}}
+const pl=(n,w)=>`${n} ${w}${n===1?'':'s'}`;
+// Ask before a change that touches students' grades or pending registrations. Resolves to {removed_grades} or null (cancelled).
+function confirmImpact(p){const items=[];
+ for(const s of p.renamedSections)items.push(`Section <b>${esc(s.from)}</b> will be renamed to <b>${esc(s.to)}</b>. Its students and pending registrations move with it.`);
+ for(const s of p.removedSections)if(s.registrations)items.push(`Section <b>${esc(s.name)}</b> is removed. ${pl(s.registrations,'pending registration')} for it will be set to <b>Auto</b> (placed in the least-filled section when approved).`);
+ for(const s of p.renamedSubjects)if(s.students)items.push(`<b>${esc(s.from)}</b> will be renamed to <b>${esc(s.to)}</b> in the grades of ${pl(s.students,'student')}.`);
+ for(const s of p.unitChanges)if(s.students)items.push(`<b>${esc(s.subject)}</b> changes from ${s.from} to ${s.to} units. The GWA of ${pl(s.students,'student')} will be recalculated.`);
+ const graded=p.removedSubjects.filter(s=>s.students);
+ if(!items.length&&!graded.length)return Promise.resolve({});
+ $('#cfList').innerHTML=items.map(t=>`<li>${t}</li>`).join('');
+ $('#cfGrades').hidden=!graded.length;
+ $('#cfGradesText').innerHTML=graded.map(s=>`<b>${esc(s.subject)}</b> (${pl(s.students,'student')})`).join(', ');
+ $('#fConfirm').reset();$('#cfTitle').textContent=`Save ${ord(setYear)} Year settings?`;
+ return new Promise(res=>{const d=$('#dConfirm');d.onclose=()=>res(d.returnValue==='ok'?{removed_grades:$('#fConfirm').elements.removed_grades.value}:null);d.returnValue='';d.showModal()})}
+$('#setSave').onclick=async()=>{$('#setErr').textContent='';const btn=$('#setSave');if(btn.disabled)return;btn.disabled=true;
+ try{const p=await api(`/settings/${setYear}/preview`,{method:'POST',body:settingsBody()});
+  const ok=await confirmImpact(p);if(!ok){btn.disabled=false;return}
+  await api('/settings/'+setYear,{method:'PUT',body:settingsBody(ok)});
+  toast(`${ord(setYear)} Year settings saved`);SET=null;await settings();pickSetYear(setYear)}catch(e){$('#setErr').textContent=e.message}finally{btn.disabled=false}};
 
 function refresh(){const t=location.hash.slice(1);show(TITLES[t]?t:'dashboard')}
 
@@ -182,5 +207,9 @@ function showApp(on){$('#app').hidden=!on;$('#loginView').hidden=on;if(on)refres
 $('#loginForm').onsubmit=e=>{e.preventDefault();
  if(DB.login($('#u').value,$('#p').value)){$('#loginErr').textContent='';e.target.reset();showApp(true)}
  else $('#loginErr').textContent='Invalid username or password.'};
-$('#logoutBtn').onclick=()=>{DB.logout();history.replaceState(null,'',location.pathname);showApp(false)};
+$('#logoutBtn').onclick=()=>{if(!leaveSettingsOk())return;DB.logout();history.replaceState(null,'',location.pathname);showApp(false)};
 showApp(DB.isLoggedIn());
+
+// Last safety net: show unexpected errors instead of failing silently
+window.addEventListener('unhandledrejection',e=>{e.preventDefault();toast(e.reason?.message||'Something went wrong. Please try again.')});
+window.addEventListener('error',e=>toast('Something went wrong: '+(e.message||'unknown error')));

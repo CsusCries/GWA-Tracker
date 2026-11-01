@@ -137,6 +137,15 @@
  <p id="drErr" style="color:var(--danger)"></p>
  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button><button class="btn" value="save">Submit</button></div>
 </form></dialog>
+<dialog id="dConfirm"><form method="dialog" id="fConfirm">
+ <h3 id="cfTitle">Save settings?</h3>
+ <p class="sub" style="margin:0 0 10px">This change affects existing records:</p>
+ <ul class="cflist" id="cfList"></ul>
+ <div id="cfGrades" class="cfbox"><p style="margin:0 0 10px">These subjects are being removed but students already have grades in them: <span id="cfGradesText"></span>.</p>
+  <label class="radio"><input type="radio" name="removed_grades" value="keep" checked> Keep those grades (they still count toward GWA)</label>
+  <label class="radio"><input type="radio" name="removed_grades" value="delete"> Delete those grades (GWA is recalculated without them)</label></div>
+ <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button><button class="btn" value="ok">Save changes</button></div>
+</form></dialog>
 <div class="toast" id="toast"></div>
 <script src="js/db.js"></script>
 <script src="js/app.js"></script>
